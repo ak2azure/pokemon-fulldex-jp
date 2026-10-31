@@ -14,6 +14,10 @@
   12-dot Japanese font (efont / Shinonome). GAME LIST: LANGUAGE switches between 日本語 and ENGLISH.
 - **The Japanese Pokémon Platinum (CPUJ) and Black 2 (IREJ)**: their function tables made from the
   English ones (tools/match_table.py). Their saves: `platinum-jp.sav`, `black2-jp.sav`.
+- **The Japanese SoulSilver (IPGJ) and HeartGold (IPKJ)**: the US SoulSilver's tables with their shifts
+  (tools/soulsilver/match_japanese.py). The all-games Switch program is built with SoulSilver's tables
+  kept in tools/soulsilver/tables (addresses only), so its build needs no ROM. Saves: `soulsilver-jp.sav`,
+  `heartgold-jp.sav`.
 - **A new address: github.com/mamesj/pokemon-fulldex** (the old pokemon-ds-widescreen address
   still leads there). The bug report link, the PC download's `README.txt` and the Linux
   AppImage's updates use it.
