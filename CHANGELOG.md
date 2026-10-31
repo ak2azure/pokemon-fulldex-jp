@@ -18,6 +18,8 @@
   (tools/soulsilver/match_japanese.py). The all-games Switch program is built with SoulSilver's tables
   kept in tools/soulsilver/tables (addresses only), so its build needs no ROM. Saves: `soulsilver-jp.sav`,
   `heartgold-jp.sav`.
+- **HOME MENU ICONS in Japanese**: with the menus in Japanese, the icons get the games' Japanese titles
+  (ポケットモンスター ブラック ...; the English versions marked 英語版). Install them again to change them.
 - **A new address: github.com/mamesj/pokemon-fulldex** (the old pokemon-ds-widescreen address
   still leads there). The bug report link, the PC download's `README.txt` and the Linux
   AppImage's updates use it.
