@@ -44,8 +44,9 @@ for tool in cmake ninja; do
     command -v "$tool" >/dev/null || fail "$tool is not installed (sudo apt install cmake ninja-build)"
 done
 
-# The game's code, generated from the ROM (once).
-if [ ! -f gen/sources.cmake ]; then
+# The game's code, generated from the ROM (once). (Not for a JIT build: it takes its tables from
+# SSR_SWITCH_GEN, which may be Black 2's empty ones, tools/bw2/stubgen, with no ROM at all.)
+if [ "$JIT" != 1 ] && [ ! -f gen/sources.cmake ]; then
     ROM="${1:-}"
     [ -n "$ROM" ] || fail "gen/ is missing: give your SoulSilver (US) ROM, e.g. tools/switch/build.sh ~/soulsilver.nds"
     [ -f "$ROM" ] || fail "no such file: $ROM"
