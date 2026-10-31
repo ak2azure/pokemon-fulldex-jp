@@ -12,6 +12,8 @@
   (the Japanese ones too) and Platinum, leaving SoulSilver and HeartGold out.
 - **Menus in Japanese**: the game list, its settings, the pause menu and the messages, with a
   12-dot Japanese font (efont / Shinonome). GAME LIST: LANGUAGE switches between 日本語 and ENGLISH.
+- **The Japanese Pokémon Platinum (CPUJ) and Black 2 (IREJ)**: their function tables made from the
+  English ones (tools/match_table.py). Their saves: `platinum-jp.sav`, `black2-jp.sav`.
 - **A new address: github.com/mamesj/pokemon-fulldex** (the old pokemon-ds-widescreen address
   still leads there). The bug report link, the PC download's `README.txt` and the Linux
   AppImage's updates use it.
