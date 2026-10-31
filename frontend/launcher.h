@@ -499,6 +499,7 @@ inline void SyncGbaSettings(const std::string& cfg, const std::string& dataDir)
 inline void LoadLook(const std::string& cfg, const std::string& folder, Theme& t, Background& b)
 {
     t = ThemeNamed(ConfigValue(cfg, "list_colour"));
+    I18n::SetLanguage(ConfigValue(cfg, "list_language"));
     b = Background();
     t.background = nullptr;
     if (ConfigValue(cfg, "list_background") != "picture") return;
@@ -897,6 +898,9 @@ inline std::vector<Setting> SettingsList()
                   "PUTS AN ICON FOR EACH GAME IN THIS LIST ON THE HOME MENU WITH ITS PICTURE. IT STARTS THAT GAME STRAIGHT AWAY. MADE ON THIS CONSOLE: NO PC OR KEYS FILE NEEDED. LIKE ANY FORWARDER THE ICONS NEED SIGPATCHES TO START. INSTALL AGAIN AFTER ADDING GAMES. REMOVE ONE IN THE HOME MENU (OPTIONS / DELETE SOFTWARE)." });
 #endif
     // The game list's own look (GAME LIST: ThemeNamed, Background).
+    // The menus' language (frontend/i18n.h). (Its values are drawn as they are: the Japanese
+    // one in Japanese.)
+    l.push_back({ "list_language", "LANGUAGE", { { "ja", "日本語" }, { "en", "ENGLISH" } }, "ja", "THE MENUS' LANGUAGE: JAPANESE OR ENGLISH." });
     l.push_back({ "list_colour", "COLOUR", { { "red", "RED" }, { "blue", "BLUE" }, { "green", "GREEN" }, { "purple", "PURPLE" },
                   { "gold", "GOLD" }, { "pink", "PINK" }, { "teal", "TEAL" } }, "red",
                   "THE GAME LIST'S COLOUR: ITS LINES, THE FRAME ROUND THE CHOSEN GAME AND THE TABS." });
@@ -956,6 +960,52 @@ inline std::vector<std::string> Wrap(const std::string& text, int chars)
         if (ch == ' ') flush();
         else word += ch;
     flush();
+    if (!line.empty()) lines.push_back(line);
+    return lines;
+}
+
+// Text to lines at most maxW pixels wide as Canvas draws them at `scale`: English at its spaces,
+// Japanese (the menus' language, I18n) between any two of its characters, except before the
+// marks that end a phrase (、。」) and ).
+inline std::vector<std::string> WrapPx(const std::string& text, int maxW, int scale)
+{
+    std::vector<std::string> lines;
+    // (The pieces a line may end after: a word and its space, or one Japanese character.)
+    std::vector<std::string> pieces;
+    std::string cur;
+    for (size_t at = 0; at < text.size();)
+    {
+        const size_t from = at;
+        const unsigned cp = I18n::Next(text, at);
+        const std::string ch = text.substr(from, at - from);
+        const bool closing = cp == 0x3001 || cp == 0x3002 || cp == 0x300D || cp == ')';
+        if (cp >= 0x80 && !closing)
+        {
+            if (!cur.empty()) pieces.push_back(cur);
+            cur = ch;
+            continue;
+        }
+        cur += ch;
+        if (cp == ' ' || (cp >= 0x80 && closing))
+        {
+            pieces.push_back(cur);
+            cur.clear();
+        }
+    }
+    if (!cur.empty()) pieces.push_back(cur);
+    std::string line;
+    for (const std::string& p : pieces)
+    {
+        if (!line.empty() && Canvas::TextWidth(line + p, scale) > maxW)
+        {
+            while (!line.empty() && line.back() == ' ') line.pop_back();
+            lines.push_back(line);
+            line.clear();
+            if (p == " ") continue;
+        }
+        line += p;
+    }
+    while (!line.empty() && line.back() == ' ') line.pop_back();
     if (!line.empty()) lines.push_back(line);
     return lines;
 }
@@ -1160,7 +1210,9 @@ struct SettingsPage
     void Draw(Canvas& c, const std::string& hint, const Theme& th = Theme())
     {
         const int s = std::max(1, c.h / 240);
-        const int ts = std::max(1, (s * 2 + 1) / 3); // the text's scale: 2 at 720 lines, 3 at 1080
+        // The text's scale: 2 at 720 lines, 3 at 1080. (In Japanese 3 at 720 lines: its 12-dot
+        // characters are then drawn at 2 pixels a dot, Canvas::JpScale. At 1 they were too small.)
+        const int ts = I18n::Japanese() ? s : std::max(1, (s * 2 + 1) / 3);
         c.Fill(0, 0, c.w, c.h, th.bg);
         c.Fill(0, 0, c.w, 22 * s, th.band);
         c.Fill(0, 22 * s, c.w, th.bandLineH * s, th.bandLine);
@@ -1182,7 +1234,7 @@ struct SettingsPage
             }
             if (i == selected) selFirst = (int)out.size();
             out.push_back({ e.name, e.key ? Shown(e) : "", i, true });
-            for (const std::string& l : Wrap(e.text, width / (6 * ts) - 2)) out.push_back({ l, "", i, false });
+            for (const std::string& l : WrapPx(I18n::Tr(e.text), width - 2 * 6 * ts, ts)) out.push_back({ l, "", i, false });
             if (i == selected) selLast = (int)out.size() - 1;
             out.push_back({ "", "", -1, false });
         }
@@ -1215,7 +1267,7 @@ struct SettingsPage
                 }
             }
             else if (!l.text.empty())
-                c.Text(x + 2 * 6 * ts, y, l.text, ts, sel ? th.name : th.sub);
+                c.Text(x + 2 * 6 * ts, y, l.text, ts, sel ? th.name : th.sub, false); // (translated whole)
         }
         if (scroll > 0) c.Fill(c.w / 2 - 8 * s, top - 4 * s, 16 * s, s, th.hint);
         if (scroll + fit < (int)out.size()) c.Fill(c.w / 2 - 8 * s, bottom + s, 16 * s, s, th.hint);

@@ -8,6 +8,9 @@
 #include <string>
 #include <vector>
 
+#include "i18n.h"
+#include "jpfont.h"
+
 struct Canvas
 {
     int w = 0, h = 0;
@@ -118,12 +121,47 @@ struct Canvas
         return p ? font[36 + (p - punct)] : nullptr;
     }
 
-    static int TextWidth(const std::string& s, int scale) { return (int)s.size() * 6 * scale; }
+    // The Japanese characters' size (jpfont.h, 12 dots): their dots at a whole number of pixels
+    // nearest the letters' height (7 dots at `scale`): 1 for scale 2, 2 for 3 and 4.
+    static int JpScale(int scale) { return std::max(1, (7 * scale + 6) / 12); }
 
-    void Text(int x, int y, const std::string& s, int scale, uint32_t argb)
+    // The text as drawn (I18n::Tr: in the menus' language), its width in pixels.
+    static int TextWidth(const std::string& s, int scale)
     {
-        for (char c : s)
+        const std::string t = I18n::Tr(s);
+        int w = 0;
+        for (size_t at = 0; at < t.size();)
         {
+            const unsigned cp = I18n::Next(t, at);
+            if (cp < 0x80) w += 6 * scale;
+            else if (const JpFont::Glyph* g = JpFont::Find(cp)) w += g->w * JpScale(scale);
+            else w += 12 * JpScale(scale);
+        }
+        return w;
+    }
+
+    // translate false: s is drawn as it is (a line of a text translated as a whole, WrapPx).
+    void Text(int x, int y, const std::string& s, int scale, uint32_t argb, bool translate = true)
+    {
+        const std::string t = translate ? I18n::Tr(s) : s;
+        const int js = JpScale(scale);
+        // (The 12-dot characters centred on the letters' 7 dots.)
+        const int jy = y + (7 * scale - 11 * js) / 2;
+        for (size_t at = 0; at < t.size();)
+        {
+            const unsigned cp = I18n::Next(t, at);
+            if (cp >= 0x80)
+            {
+                const JpFont::Glyph* g = JpFont::Find(cp);
+                if (g)
+                    for (int row = 0; row < 12; row++)
+                        for (int col = 0; col < g->w; col++)
+                            if (g->rows[row] & (0x8000 >> col))
+                                Fill(x + col * js, jy + row * js, js, js, argb);
+                x += (g ? g->w : 12) * js;
+                continue;
+            }
+            char c = (char)cp;
             // \x05: E with an acute accent (the É of POKÉMON): a whole E, the accent above the
             // line, two pixels slanting up to the right with a row's gap.
             if (c == '\x05')
