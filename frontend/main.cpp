@@ -1606,7 +1606,10 @@ int main(int argc, char** argv)
     FuncWatch::RomPath = opt.rom; // (for a function table that reads its first bytes from it)
     // Pokemon SoulSilver (US): its new game's first menu is skipped (see where keys are sent).
     // (HeartGold too: the same game where it matters here.)
-    const bool soulSilverRom = rom.size() > 0x10 && (memcmp(&rom[0x0C], "IPGE", 4) == 0 || memcmp(&rom[0x0C], "IPKE", 4) == 0);
+    const bool soulSilverRom = rom.size() > 0x10 && (memcmp(&rom[0x0C], "IPGE", 4) == 0 || memcmp(&rom[0x0C], "IPKE", 4) == 0 ||
+        // (The Japanese SoulSilver and HeartGold: the US SoulSilver's tables with their shifts,
+        // tools/soulsilver/soulsilver-jp.json and heartgold-jp.json.)
+        memcmp(&rom[0x0C], "IPGJ", 4) == 0 || memcmp(&rom[0x0C], "IPKJ", 4) == 0);
     if (rom.empty())
     {
         fprintf(stderr, "cannot read ROM: %s\n", opt.rom.c_str());

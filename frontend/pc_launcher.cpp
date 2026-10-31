@@ -276,7 +276,7 @@ bool Playable(const Folders& fo, const Launcher::Game& g)
 {
     if (g.platform == Launcher::GBA) return true; // (any GBA game plays, with widescreen or without)
     if (!g.known) return false;
-    if (g.code == "IPGE" || g.code == "IPKE") return rc_num_chunks > 0;
+    if (g.code == "IPGE" || g.code == "IPKE" || g.code == "IPGJ" || g.code == "IPKJ") return rc_num_chunks > 0;
     return Exists(fo.funcs + "/" + g.code + ".txt");
 }
 
@@ -1563,7 +1563,7 @@ bool Start(int& argc, char**& argv)
 #endif
     // SoulSilver and HeartGold take their layouts from the program's own tables and must not be
     // given a function table (one switches to the Black games' layouts); the others take theirs.
-    if (game.code != "IPGE" && game.code != "IPKE")
+    if (game.code != "IPGE" && game.code != "IPKE" && game.code != "IPGJ" && game.code != "IPKJ")
     {
         g_args.push_back("--funcs");
         g_args.push_back(fo.funcs + "/" + game.code + ".txt");

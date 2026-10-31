@@ -34,6 +34,8 @@ static const Pair kWords[] = {
     { "WHITE 2", "ホワイト2" },
     { "SOULSILVER", "ソウルシルバー" },
     { "HEARTGOLD", "ハートゴールド" },
+    { "SOULSILVER (JAPAN)", "ソウルシルバー JP" },
+    { "HEARTGOLD (JAPAN)", "ハートゴールド JP" },
     { "PLATINUM", "プラチナ" },
     { "PLATINUM (JAPAN)", "プラチナ JP" },
     { "EMERALD", "エメラルド" },
