@@ -7,6 +7,9 @@
   save is `black-jp.sav`.
 - **The Japanese Pokémon White (IRAJ)**, the same: its table made from the Japanese Black's
   (`tools/bw1/match_jp.py --via-jp-black`). Its save is `white-jp.sav`.
+- **The all-games Switch program without a SoulSilver ROM**: `tools/switch/build_game.sh all`
+  with no ROM makes the same program (the game list and its settings) with the Black games
+  (the Japanese ones too) and Platinum, leaving SoulSilver and HeartGold out.
 - **A new address: github.com/mamesj/pokemon-fulldex** (the old pokemon-ds-widescreen address
   still leads there). The bug report link, the PC download's `README.txt` and the Linux
   AppImage's updates use it.
