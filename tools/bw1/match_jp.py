@@ -5,6 +5,12 @@ the repository, so the Japanese tables are made without it (and without any ROM)
 
     python3 tools/bw1/match_jp.py <aletheia>/layout/function_addrs.tsv <black-en.nds> <black-jp.nds>
     python3 tools/bw1/match_jp.py <aletheia>/layout/function_addrs.tsv <black-en.nds> <white-jp.nds>
+    python3 tools/bw1/match_jp.py <aletheia>/layout/function_addrs.tsv --via-jp-black <black-jp.nds> <white-jp.nds>
+
+--via-jp-black: with no English Black at hand, the Japanese Black stands in for it, its functions
+read where tools/bw1/jp_black_shifts.txt puts them (the Japanese White is nearer to it than to the
+English one: the same structures' offsets, too). The shifts written are still from the English
+addresses.
 
 The Japanese games are the same program as the English ones, built earlier and with their own
 text: most functions are where the English ones are plus a shift that changes now and then
@@ -49,6 +55,8 @@ def find_bw2map(en, jp):
     0xe000f, 0xc000d, 0xa000b; the Japanese heap is smaller), found by their contents."""
     import struct
     out = {}
+    # (Through the Japanese Black: its own table, frontend/bw2map.h's IRBJ line.)
+    src, table = (en.rom, 0x021d3530) if isinstance(en, ViaShifts) else (en, 0x021d3700)
     base, data = jp.ovs.get(21, (0, b""))
     first = struct.pack("<II", 0x200000, 0x400000)
     hits = []
@@ -56,7 +64,7 @@ def find_bw2map(en, jp):
         if data[o:o + 8] != first:
             continue
         # (The table's 21 entries: each with a map window size where the English has one.)
-        if all(data[o + i * 72 + 16:o + i * 72 + 20] == en.read("ov21", 0x021d3700 + i * 72 + 16, 4) for i in range(21)):
+        if all(data[o + i * 72 + 16:o + i * 72 + 20] == src.read("ov21", table + i * 72 + 16, 4) for i in range(21)):
             hits.append(base + o)
     out["table"] = hits[:1]
     tail = struct.pack("<4I", 0xE000F, 0xC000D, 0xA000B, 0)
@@ -70,6 +78,33 @@ def find_bw2map(en, jp):
         o = jp.main.find(tail, o + 4)
     out["heapSetup"] = hits
     return out
+
+
+class ViaShifts:
+    """A ROM read at the English Black's addresses through a shifts file (the Japanese Black's)."""
+
+    def __init__(self, rom, shifts_path):
+        # (As tools/bw1/funcmap.py's load_shifts: module -> sorted [(from, shift)].)
+        self.rom, self.shifts = rom, {}
+        for line in open(shifts_path):
+            p = line.split("#", 1)[0].split()
+            if len(p) >= 3:
+                self.shifts.setdefault(p[0], []).append((int(p[1], 16), int(p[2], 16)))
+        for v in self.shifts.values():
+            v.sort()
+        # (The overlays' English bases: each module's first shift is its overlay's move.)
+        self.ovs = {}
+        for oid, (base, data) in rom.ovs.items():
+            first = self.shifts.get("ov%03d" % oid)
+            self.ovs[oid] = (base - (first[0][1] if first else 0), data)
+
+    def read(self, module, addr, size):
+        d = 0
+        for start, delta in self.shifts.get(module, ()):
+            if start > addr:
+                break
+            d = delta
+        return self.rom.read(module, addr + d, size)
 
 
 def similar(en, jp, module, addr, size, isa, tok, delta, reach=0x400, least=0.8):
@@ -88,13 +123,19 @@ def similar(en, jp, module, addr, size, isa, tok, delta, reach=0x400, least=0.8)
 
 
 def main():
-    tsv, en_path, jp_path = sys.argv[1:4]
+    args = sys.argv[1:]
+    via = "--via-jp-black" in args
+    if via:
+        args.remove("--via-jp-black")
+    tsv, en_path, jp_path = args[:3]
     en, jp = Rom(en_path), Rom(jp_path)
+    if via:
+        en = ViaShifts(en, os.path.join(HERE, "jp_black_shifts.txt"))
     game = open(jp_path, "rb").read(0x10)[0x0C:0x10]
     if game not in (b"IRBJ", b"IRAJ"):
         print("warning: %s is not the Japanese Black or White: game code %r" % (jp_path, game))
     white = game == b"IRAJ"
-    out_path = sys.argv[4] if len(sys.argv) > 4 else os.path.join(HERE, "jp_white_shifts.txt" if white else "jp_black_shifts.txt")
+    out_path = args[3] if len(args) > 3 else os.path.join(HERE, "jp_white_shifts.txt" if white else "jp_black_shifts.txt")
     names, aliases = watched_names()
     # (The overlays: the same numbers in both, checked here.)
     only_en = sorted(set(en.ovs) - set(jp.ovs))
