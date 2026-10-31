@@ -43,6 +43,9 @@ def main():
     total_found = total_missed = 0
     for e in layout['sections']:
         src = e['source']
+        # (moved: where the Japanese overlay is loaded less where SoulSilver's is. The shifts are
+        # of offsets in the overlay; the runtime adds the overlay's move to them.)
+        moved = 0
         if src == 'main':
             a, b = us_main, jp_main
         elif src in ('itcm',) or not str(src).isdigit():
@@ -51,6 +54,7 @@ def main():
             if int(src) not in us_ovl or int(src) not in jp_ovl:
                 continue
             a, b = us_ovl[int(src)][1], jp_ovl[int(src)][1]
+            moved = jp_ovl[int(src)][0] - us_ovl[int(src)][0]
         if e['name'] not in names:
             continue
         sec = names.index(e['name'])
@@ -134,6 +138,10 @@ def main():
             else:
                 segs.append([start, end, d])
         segs = [s for s in segs if s[2]]
+        if moved:
+            # (The overlay's own move, a stretch from 0 to 0: the runtime moves the section
+            # and every address in it by it, rc_portable_load and Remap in runtime/recomp_rt.cpp.)
+            segs.insert(0, [0, 0, moved])
         if segs:
             result[e['name']] = segs
         total_found += found
