@@ -4,6 +4,10 @@ symbol files (ds-decomp configs) and your own ROM.
     python3 tools/bw2/funcmap.py <pokebw2>/config/b2_us/arm9 <rom.nds> out/b2_funcs.txt
     python3 tools/bw2/funcmap.py <pokebw2>/config/w2_us/arm9 <rom.nds> out/w2_funcs.txt
     python3 tools/bw2/funcmap.py <pokebw2>/config/b2_us/arm9 - out/IREO.txt
+    python3 tools/bw2/funcmap.py <pokebw2>/config/b2_us/arm9 - out/IREJ.txt --jp-black2
+
+--jp-black2 makes the Japanese Black 2's (IREJ) table: the same functions at its addresses, from
+tools/bw2/jp_black2_shifts.txt (made with tools/match_table.py from the English and Japanese ROMs).
 
 With - for the ROM, the overlay functions' first bytes are left as ?: the program reads them
 from the player's ROM when it starts (frontend/funcwatch.h), so the table can go in a program
@@ -83,15 +87,39 @@ def overlays(rom):
     return result
 
 
+def load_shifts(path):
+    """module -> sorted [(English address from which, Japanese - English)]."""
+    out = {}
+    for line in open(path):
+        p = line.split("#", 1)[0].split()
+        if len(p) >= 3:
+            out.setdefault(p[0], []).append((int(p[1], 16), int(p[2], 16)))
+    for v in out.values():
+        v.sort()
+    return out
+
+
 def main():
-    cfg, rom_path, out_path = sys.argv[1:4]
+    args = [a for a in sys.argv[1:] if a != "--jp-black2"]
+    jp = "--jp-black2" in sys.argv[1:]
+    shifts = load_shifts(os.path.join(os.path.dirname(os.path.abspath(__file__)), "jp_black2_shifts.txt")) if jp else {}
+
+    def shifted(module, addr):
+        d = 0
+        for start, delta in shifts.get(module, ()):
+            if start > addr:
+                break
+            d = delta
+        return addr + d
+
+    cfg, rom_path, out_path = args[:3]
     if rom_path == "-":
         rom, ovs = None, {}
     else:
         rom = open(rom_path, "rb").read()
         # (Each version's functions are at its own addresses: the other version's table would
         # point into the middle of functions.)
-        want = {"b2_us": b"IREO", "w2_us": b"IRDO"}
+        want = {"b2_us": b"IREJ" if jp else b"IREO", "w2_us": b"IRDO"}
         version = os.path.basename(os.path.dirname(os.path.normpath(cfg)))
         if version in want and rom[0x0C:0x10] != want[version]:
             sys.exit(f"this ROM is {rom[0x0C:0x10].decode('ascii', 'replace')}, but {version} is for "
@@ -107,6 +135,7 @@ def main():
             if not m:
                 continue
             name, kind, addr = m.group(1), m.group(2), int(m.group(3), 16)
+            addr = shifted(module, addr)
             first = "?" if rom is None and module.startswith("ov") else "-"
             if check:
                 base, data = check
