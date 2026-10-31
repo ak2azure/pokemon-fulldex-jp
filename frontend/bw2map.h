@@ -79,6 +79,9 @@ private:
         static const Version versions[] = {
             { "IREO", 0x021ca01c, 0x0208ee68, 0x1a3e00, 29 }, // Black 2
             { "IRDO", 0x021ca050, 0x0208ee94, 0x1a3e00, 29 }, // White 2
+            // The Japanese Black 2: the same table, found by its contents, and a user heap 0x600
+            // bytes smaller.
+            { "IREJ", 0x021c9768, 0x0208eb48, 0x1a3800, 29 }, // Black 2 (Japan)
             { "IRBO", 0x021d3700, 0x0209d8b0, 0x199500, 21 }, // Black
             { "IRAO", 0x021d3718, 0x0209d8c8, 0x199500, 21 }, // White
             // The Japanese Black and White: the same table, found by its contents (tools/bw1/match_jp.py), and

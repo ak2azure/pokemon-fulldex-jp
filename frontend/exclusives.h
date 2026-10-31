@@ -74,7 +74,7 @@ public:
     // function is added to those watched).
     void Init(const std::string& code, FuncWatch& watch, std::vector<std::string>& names, melonDS::NDS& nds)
     {
-        const bool b2w2 = code == "IREO" || code == "IRDO", bw = code == "IRBO" || code == "IRAO" || code == "IRBJ" || code == "IRAJ";
+        const bool b2w2 = code == "IREO" || code == "IRDO" || code == "IREJ", bw = code == "IRBO" || code == "IRAO" || code == "IRBJ" || code == "IRAJ";
         if (!b2w2 && !bw) return;
         const char* fn = b2w2 ? "EncData_Load" : "FIELD_ENCOUNT_ST_LoadEncountData";
         const int f = watch.Find(fn);
