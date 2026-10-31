@@ -1,0 +1,26 @@
+name: Switch all games
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  switch:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git cmake ninja-build python3 pkg-config ca-certificates
+          [ -f /opt/devkitpro/portlibs/switch/lib/libSDL2.a ] || dkp-pacman -S --noconfirm switch-sdl2
+          [ -f /opt/devkitpro/libnx/lib/libdeko3d.a ] || dkp-pacman -S --noconfirm deko3d || true
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Build
+        env:
+          DEVKITPRO: /opt/devkitpro
+        run: bash tools/switch/build_game.sh all
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pokemon-ds-wide-all-switch
+          path: build-sd/pokemon-ds-wide-all-switch.zip
