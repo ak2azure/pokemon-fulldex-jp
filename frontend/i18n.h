@@ -178,6 +178,27 @@ inline std::string Tr(const std::string& s)
     return t;
 }
 
+// A game's Japanese title by its game code, for the HOME Menu icons (HOME MENU ICONS: the
+// Switch's own font shows it), or nullptr. The English versions say so, beside the Japanese.
+inline const char* GameTitle(const std::string& code)
+{
+    static const struct { const char* code; const char* title; } titles[] = {
+        { "IRBJ", "ポケットモンスター ブラック" }, { "IRBO", "ポケットモンスター ブラック (英語版)" },
+        { "IRAJ", "ポケットモンスター ホワイト" }, { "IRAO", "ポケットモンスター ホワイト (英語版)" },
+        { "IREJ", "ポケットモンスター ブラック2" }, { "IREO", "ポケットモンスター ブラック2 (英語版)" },
+        { "IRDJ", "ポケットモンスター ホワイト2" }, { "IRDO", "ポケットモンスター ホワイト2 (英語版)" },
+        { "IPGJ", "ポケットモンスター ソウルシルバー" }, { "IPGE", "ポケットモンスター ソウルシルバー (英語版)" },
+        { "IPKJ", "ポケットモンスター ハートゴールド" }, { "IPKE", "ポケットモンスター ハートゴールド (英語版)" },
+        { "CPUJ", "ポケットモンスター プラチナ" }, { "CPUE", "ポケットモンスター プラチナ (英語版)" },
+        { "BPEE", "ポケットモンスター エメラルド (英語版)" },
+        { "BPRE", "ポケットモンスター ファイアレッド (英語版)" },
+        { "BPGE", "ポケットモンスター リーフグリーン (英語版)" },
+    };
+    for (const auto& t : titles)
+        if (code == t.code) return t.title;
+    return nullptr;
+}
+
 // The next character of a UTF-8 string from `at` (moved past it), or 0 at the end.
 inline unsigned Next(const std::string& s, size_t& at)
 {

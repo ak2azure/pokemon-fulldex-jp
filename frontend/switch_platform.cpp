@@ -138,6 +138,9 @@ std::string InstallHomeIcons(const std::vector<Launcher::Game>& games)
         SwitchForwarder::Entry e;
         const Launcher::KnownGame* k = Launcher::Known(g.code);
         e.name = k ? k->name : Launcher::TitleCase(g.name);
+        // (In Japanese, the menus' language: the game's Japanese title, I18n::GameTitle.)
+        if (I18n::Japanese())
+            if (const char* jp = I18n::GameTitle(g.code)) e.name = jp;
         e.args = "--game " + g.code;
         // The icon: the player's own picture in icons/ if there is one, else the box art built
         // into the program, else the list's picture (a one-game program's icon can be a placeholder).
