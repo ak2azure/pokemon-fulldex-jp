@@ -10,6 +10,8 @@
 - **The all-games Switch program without a SoulSilver ROM**: `tools/switch/build_game.sh all`
   with no ROM makes the same program (the game list and its settings) with the Black games
   (the Japanese ones too) and Platinum, leaving SoulSilver and HeartGold out.
+- **Menus in Japanese**: the game list, its settings, the pause menu and the messages, with a
+  12-dot Japanese font (efont / Shinonome). GAME LIST: LANGUAGE switches between 日本語 and ENGLISH.
 - **A new address: github.com/mamesj/pokemon-fulldex** (the old pokemon-ds-widescreen address
   still leads there). The bug report link, the PC download's `README.txt` and the Linux
   AppImage's updates use it.
