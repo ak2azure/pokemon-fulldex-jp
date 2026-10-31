@@ -8,6 +8,7 @@
 #   tools/switch/build_game.sh hgss       your-soulsilver-us.nds
 #   tools/switch/build_game.sh white      your-white-us-or-europe.nds
 #   tools/switch/build_game.sh all        your-soulsilver-us.nds
+#   tools/switch/build_game.sh all        (no ROM: without SoulSilver and HeartGold)
 #   tools/switch/build_game.sh platinum
 #
 # bw needs no ROM: one program for Black 2, White 2, Black and White that reads what it needs
@@ -26,7 +27,8 @@
 # (frontend/launcher.h): SoulSilver and HeartGold's tables (as hgss) and the Black games'
 # function tables (as bw) in one .nro, as build-sd/pokemon-ds-wide-switch.zip
 # (switch/pokemon-ds-wide/pokemon-ds-wide.nro), as build-sd/pokemon-ds-wide-all-switch.zip: the
-# all-games release's download. It holds nothing of the games either.
+# all-games release's download. It holds nothing of the games either. Without the SoulSilver
+# ROM the same program is made with the Black games (the Japanese ones too) and Platinum only.
 # SSR_SWITCH_ICON_ALL: its Homebrew Menu icon.
 #
 # The result is a folder laid out like the SD card, build-sd/switch/<game folder>/, with the
@@ -71,7 +73,9 @@ case "$GAME" in
     bw|hgss|all|platinum) FOLDER=; NRO= ;;
     *) fail "which game? tools/switch/build_game.sh soulsilver|hgss|all|black2|white2|black|white your-rom.nds (or bw or platinum, no ROM)" ;;
 esac
-if [ "$GAME" != bw ] && [ "$GAME" != platinum ]; then
+if [ "$GAME" = all ] && [ -z "$ROM" ]; then
+    : # (all without a ROM: no SoulSilver or HeartGold, see below)
+elif [ "$GAME" != bw ] && [ "$GAME" != platinum ]; then
     [ -n "$ROM" ] || fail "give your ROM: tools/switch/build_game.sh $GAME your-rom.nds"
     [ -f "$ROM" ] || fail "no such file: $ROM"
     ROM="$(cd "$(dirname "$ROM")" && pwd)/$(basename "$ROM")"
@@ -148,14 +152,23 @@ all)
     # the SoulSilver ROM as for hgss) and the Black games' function tables in its romfs (as for bw).
     # It shows the list of the player's games when it starts (frontend/launcher.h).
     BUILD=build-switch-all
-    [ "$(dd if="$ROM" bs=1 skip=12 count=4 2>/dev/null)" = IPGE ] ||
-        fail "$ROM is not Pokemon SoulSilver (US, game code IPGE): the tables are made from it"
-    if [ ! -f gen/sources.cmake ]; then
-        say "SoulSilver's tables, from $ROM"
-        python3 tools/recomp.py --rom "$ROM" --layout layouts/soulsilver-us.json melonDS/src gen
-        python3 tools/apps.py --layout layouts/soulsilver-us.json gen
+    if [ -z "$ROM" ]; then
+        # Without the SoulSilver ROM: the Black games and Platinum only (Black 2's empty tables,
+        # tools/bw2/stubgen, as for bw). The list then leaves SoulSilver and HeartGold out
+        # (Playable in frontend/switch_platform.cpp: no recompiled code).
+        say "No SoulSilver ROM: the Black games and Platinum only (no SoulSilver or HeartGold)"
+        GEN_TABLES="$HERE/tools/bw2/stubgen"
+    else
+        [ "$(dd if="$ROM" bs=1 skip=12 count=4 2>/dev/null)" = IPGE ] ||
+            fail "$ROM is not Pokemon SoulSilver (US, game code IPGE): the tables are made from it"
+        if [ ! -f gen/sources.cmake ]; then
+            say "SoulSilver's tables, from $ROM"
+            python3 tools/recomp.py --rom "$ROM" --layout layouts/soulsilver-us.json melonDS/src gen
+            python3 tools/apps.py --layout layouts/soulsilver-us.json gen
+        fi
+        python3 tools/soulsilver/tables_only.py gen build-gen-tables
+        GEN_TABLES="$HERE/build-gen-tables"
     fi
-    python3 tools/soulsilver/tables_only.py gen build-gen-tables
     ROMFS="$HERE/$BUILD/romfs"
     bw_tables "$ROMFS"
     cp tools/platinum/CPUE.txt "$ROMFS/funcs/CPUE.txt"
@@ -187,7 +200,7 @@ all)
         say "GBA games too: $SSR_GBA_DIR"
     fi
     say "Compiling for the Switch"
-    build SSR_SWITCH_JIT=1 SSR_SWITCH_GEN="$HERE/build-gen-tables" SSR_SWITCH_BUILD="$BUILD" \
+    build SSR_SWITCH_JIT=1 SSR_SWITCH_GEN="$GEN_TABLES" SSR_SWITCH_BUILD="$BUILD" \
         SSR_SWITCH_ROMFS="$ROMFS" SSR_ALL_GAMES=ON SSR_PC_ART="$ART" SSR_NRO_TITLE="Pokémon Fulldex" bash tools/switch/build.sh
     mkdir -p build-sd/switch/pokemon-ds-wide/roms
     cp "$BUILD/ssrecomp.nro" build-sd/switch/pokemon-ds-wide/pokemon-ds-wide.nro
@@ -246,7 +259,7 @@ soulsilver)
     python3 tools/soulsilver/tables_only.py gen build-gen-tables
     [ -n "${SSR_SWITCH_ICON:-}" ] && install -D -m 644 "$SSR_SWITCH_ICON" "$BUILD/icon.jpg"
     say "Compiling for the Switch"
-    build SSR_SWITCH_JIT=1 SSR_SWITCH_GEN="$HERE/build-gen-tables" SSR_SWITCH_BUILD="$BUILD" bash tools/switch/build.sh
+    build SSR_SWITCH_JIT=1 SSR_SWITCH_GEN="$GEN_TABLES" SSR_SWITCH_BUILD="$BUILD" bash tools/switch/build.sh
     ;;
 black2|white2)
     # (Both games are the same program: White 2 reuses Black 2's build folder, so building the
@@ -381,7 +394,7 @@ hgss)
         icon="${!var:-${SSR_SWITCH_ICON:-}}"
         rm -f "$BUILD/icon.jpg"
         [ -n "$icon" ] && install -D -m 644 "$icon" "$BUILD/icon.jpg"
-        build SSR_SWITCH_JIT=1 SSR_SWITCH_GEN="$HERE/build-gen-tables" SSR_SWITCH_BUILD="$BUILD" \
+        build SSR_SWITCH_JIT=1 SSR_SWITCH_GEN="$GEN_TABLES" SSR_SWITCH_BUILD="$BUILD" \
             SSR_NRO_TITLE="Pokemon ${g#*:}" bash tools/switch/build.sh
         mkdir -p "build-sd/switch/pokemon-${g%%:*}-wide"
         cp "$BUILD/ssrecomp.nro" "build-sd/switch/pokemon-${g%%:*}-wide/pokemon-${g%%:*}-wide.nro"
