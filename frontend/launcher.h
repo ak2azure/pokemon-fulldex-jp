@@ -82,6 +82,9 @@ inline const KnownGame* Known(const std::string& code)
     static const KnownGame games[] = {
         { "IRBO", "Pokemon Black", "black.sav" },
         { "IRAO", "Pokemon White", "white.sav" },
+        // The Japanese Black and White: their own saves (a Japanese save is not the English one's).
+        { "IRBJ", "Pokemon Black (Japan)", "black-jp.sav" },
+        { "IRAJ", "Pokemon White (Japan)", "white-jp.sav" },
         { "IREO", "Pokemon Black 2", "black2.sav" },
         { "IRDO", "Pokemon White 2", "white2.sav" },
         { "IPKE", "Pokemon HeartGold", "heartgold.sav" },
@@ -96,10 +99,11 @@ inline int Order(const std::string& code)
 {
     // (DS, then GBA: Emerald, Ultra Violet (UV22: its own code here, as FireRed's is BPRE too),
     // FireRed, LeafGreen.)
-    static const char* order[] = { "IRBO", "IRAO", "IREO", "IRDO", "IPKE", "IPGE", "CPUE", "BPEE", "UV22", "BPRE", "BPGE" };
-    for (int i = 0; i < 11; i++)
+    static const char* order[] = { "IRBO", "IRAO", "IRBJ", "IRAJ", "IREO", "IRDO", "IPKE", "IPGE", "CPUE", "BPEE", "UV22", "BPRE", "BPGE" };
+    const int n = (int)(sizeof(order) / sizeof(order[0]));
+    for (int i = 0; i < n; i++)
         if (code == order[i]) return i;
-    return 11;
+    return n;
 }
 
 // A name as the list has it (POKEMON EMERALD) as a title: Pokemon Emerald (FireRed and LeafGreen

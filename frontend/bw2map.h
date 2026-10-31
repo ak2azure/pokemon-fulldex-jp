@@ -81,6 +81,9 @@ private:
             { "IRDO", 0x021ca050, 0x0208ee94, 0x1a3e00, 29 }, // White 2
             { "IRBO", 0x021d3700, 0x0209d8b0, 0x199500, 21 }, // Black
             { "IRAO", 0x021d3718, 0x0209d8c8, 0x199500, 21 }, // White
+            // The Japanese Black: the same table, found by its contents (tools/bw1/match_jp.py), and
+            // a user heap 0x500 bytes smaller.
+            { "IRBJ", 0x021d3530, 0x0209d7bc, 0x199000, 21 }, // Black (Japan)
         };
         for (const Version& v : versions)
             if (!strcmp(code, v.code)) return &v;

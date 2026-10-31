@@ -133,6 +133,13 @@ bw_tables() { # romfs-folder
     python3 tools/bw2/funcmap.py build-decomp-pokew2/config/w2_us/arm9 - "$1/funcs/IRDO.txt"
     python3 tools/bw1/funcmap.py build-decomp-aletheia/layout/function_addrs.tsv - "$1/funcs/IRBO.txt"
     python3 tools/bw1/funcmap.py build-decomp-aletheia/layout/function_addrs.tsv - "$1/funcs/IRAO.txt" --white
+    # The Japanese Black and White: the same functions at their own addresses (tools/bw1/match_jp.py).
+    # (Each only once its shifts are in tools/bw1.)
+    [ -f tools/bw1/jp_black_shifts.txt ] &&
+        python3 tools/bw1/funcmap.py build-decomp-aletheia/layout/function_addrs.tsv - "$1/funcs/IRBJ.txt" --jp-black
+    [ -f tools/bw1/jp_white_shifts.txt ] &&
+        python3 tools/bw1/funcmap.py build-decomp-aletheia/layout/function_addrs.tsv - "$1/funcs/IRAJ.txt" --jp-white
+    true
 }
 
 case "$GAME" in

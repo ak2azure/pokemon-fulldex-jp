@@ -1,4 +1,4 @@
-// Pokemon Black and White (US/Europe, IRBO and IRAO): their own screen layouts, on top of the
+// Pokemon Black and White (US/Europe, IRBO and IRAO; Japan, IRBJ and IRAJ): their own screen layouts, on top of the
 // Black 2 ones.
 //
 // Black runs like Black 2 (melonDS's JIT, layouts that follow the game's own functions), with
@@ -58,7 +58,9 @@ public:
             if (fseek(f, 0x0C, SEEK_SET) != 0 || fread(code, 1, 4, f) != 4) code[0] = 0;
             fclose(f);
         }
-        on = !strcmp(code, "IRBO") || !strcmp(code, "IRAO");
+        // (The Japanese versions, IRBJ and IRAJ, are the same program: their tables put the same
+        // functions at their own addresses, tools/bw1/match_jp.py.)
+        on = !strcmp(code, "IRBO") || !strcmp(code, "IRAO") || !strcmp(code, "IRBJ") || !strcmp(code, "IRAJ");
         if (!on) return;
         Fw = &fw;
         auto find = [&](const char* name) {

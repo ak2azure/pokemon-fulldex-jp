@@ -8,7 +8,12 @@ function list (layout/function_addrs.tsv) and your own ROM, in the same form as 
     python3 tools/bw1/funcmap.py <aletheia>/layout/function_addrs.tsv - out/IRAO.txt --white
 
 --white makes Pokemon White's (IRAO) table: the same functions as Black's, at White's addresses
-(tools/bw1/white_shifts.txt, made by tools/bw1/match_white.py).
+(tools/bw1/white_shifts.txt, made by tools/bw1/match_white.py). --jp-black and --jp-white make
+the Japanese Black's (IRBJ) and White's (IRAJ) likewise, from tools/bw1/jp_black_shifts.txt and
+jp_white_shifts.txt (made by tools/bw1/match_jp.py):
+
+    python3 tools/bw1/funcmap.py <aletheia>/layout/function_addrs.tsv - out/IRBJ.txt --jp-black
+    python3 tools/bw1/funcmap.py <aletheia>/layout/function_addrs.tsv - out/IRAJ.txt --jp-white
 
 With - for the ROM the overlay functions' first bytes are left as ?, for the program to read
 from the player's ROM (see tools/bw2/funcmap.py).
@@ -53,7 +58,7 @@ def load_shifts(path):
 
 
 def shifted(shifts, module, addr):
-    """Where White has the function Black has at addr (unchanged where no shift is known)."""
+    """Where White (or a Japanese version) has the function Black has at addr (unchanged where no shift is known)."""
     d = 0
     for start, delta in shifts.get(module, ()):
         if start > addr:
@@ -63,18 +68,24 @@ def shifted(shifts, module, addr):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if a != "--white"]
-    white = "--white" in sys.argv[1:]
+    versions = {
+        # option: (shifts file, game code, name)
+        "--white": ("white_shifts.txt", b"IRAO", "White (US/Europe)"),
+        "--jp-black": ("jp_black_shifts.txt", b"IRBJ", "Black (Japan)"),
+        "--jp-white": ("jp_white_shifts.txt", b"IRAJ", "White (Japan)"),
+    }
+    args = [a for a in sys.argv[1:] if a not in versions]
+    chosen = [a for a in sys.argv[1:] if a in versions]
     tsv, rom_path, out_path = args[:3]
-    shifts = load_shifts(os.path.join(HERE, "white_shifts.txt")) if white else {}
-    want = b"IRAO" if white else b"IRBO"
+    shifts_file, want, title = versions[chosen[0]] if chosen else (None, b"IRBO", "Black (US/Europe)")
+    white = shifts_file is not None
+    shifts = load_shifts(os.path.join(HERE, shifts_file)) if white else {}
     if rom_path == "-":
         rom, ovs = None, {}
     else:
         rom = open(rom_path, "rb").read()
         if rom[0x0C:0x10] != want:
-            print("warning: %s is not Pokemon %s (US/Europe): game code %r"
-                  % (rom_path, "White" if white else "Black", rom[0x0C:0x10]))
+            print("warning: %s is not Pokemon %s: game code %r" % (rom_path, title, rom[0x0C:0x10]))
         ovs = overlays(rom)
     aliases = load_aliases(os.path.join(HERE, "aliases.txt"))
     found = set()

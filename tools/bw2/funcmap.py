@@ -60,6 +60,10 @@ def blz_decompress(pak):
             i += 2
             n = min((pos >> 12) + 3, want - len(out))
             pos = (pos & 0xFFF) + 3
+            if pos > len(out):
+                # (A reference before the start: not a valid overlay. The Japanese Black's
+                # overlay 12 is one, never loaded; as frontend/ndsoverlays.h, it is left empty.)
+                return b""
             for _ in range(n):
                 out.append(out[-pos])
     return bytes(pak[:dec_len]) + bytes(out[::-1])

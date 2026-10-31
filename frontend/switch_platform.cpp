@@ -819,6 +819,7 @@ bool Start(int& argc, char**& argv)
                             "  It plays the English versions of:\n"
                             "    Pokemon Black 2 (IREO), Pokemon White 2 (IRDO), Pokemon Black (IRBO)\n"
                             "    and Pokemon White (IRAO), US and Europe;\n"
+                            "    Pokemon Black (IRBJ) and Pokemon White (IRAJ), Japan;\n"
                             "    Pokemon SoulSilver (IPGE) and Pokemon HeartGold (IPKE), US, with the\n"
                             "    SoulSilver and HeartGold download;\n"
                             "    Pokemon Platinum (CPUE), with the Platinum download.\n"
