@@ -143,6 +143,9 @@ bw_tables() { # romfs-folder
         python3 tools/bw1/funcmap.py build-decomp-aletheia/layout/function_addrs.tsv - "$1/funcs/IRBJ.txt" --jp-black
     [ -f tools/bw1/jp_white_shifts.txt ] &&
         python3 tools/bw1/funcmap.py build-decomp-aletheia/layout/function_addrs.tsv - "$1/funcs/IRAJ.txt" --jp-white
+    # The Japanese Black 2 (tools/bw2/jp_black2_shifts.txt, made with tools/match_table.py).
+    [ -f tools/bw2/jp_black2_shifts.txt ] &&
+        python3 tools/bw2/funcmap.py build-decomp-pokebw2/config/b2_us/arm9 - "$1/funcs/IREJ.txt" --jp-black2
     true
 }
 
