@@ -249,7 +249,7 @@ void SetRomFolder(Folders& fo)
 // the emulator, which reads them by file name.
 void ExtractFuncs(const Folders& fo)
 {
-    for (const char* code : { "IREO", "IRDO", "IRBO", "IRAO", "IRBJ", "IRAJ", "CPUE" })
+    for (const char* code : { "IREO", "IRDO", "IRBO", "IRAO", "IRBJ", "IRAJ", "CPUE", "CPUJ" })
     {
         SDL_RWops* rw = SDL_RWFromFile((std::string("funcs/") + code + ".txt").c_str(), "rb");
         if (!rw) continue;

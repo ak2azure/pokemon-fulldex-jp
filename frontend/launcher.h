@@ -90,6 +90,7 @@ inline const KnownGame* Known(const std::string& code)
         { "IPKE", "Pokemon HeartGold", "heartgold.sav" },
         { "IPGE", "Pokemon SoulSilver", "soulsilver.sav" },
         { "CPUE", "Pokemon Platinum", "platinum.sav" },
+        { "CPUJ", "Pokemon Platinum (Japan)", "platinum-jp.sav" },
     };
     for (const KnownGame& g : games)
         if (code == g.code) return &g;
@@ -99,7 +100,7 @@ inline int Order(const std::string& code)
 {
     // (DS, then GBA: Emerald, Ultra Violet (UV22: its own code here, as FireRed's is BPRE too),
     // FireRed, LeafGreen.)
-    static const char* order[] = { "IRBO", "IRAO", "IRBJ", "IRAJ", "IREO", "IRDO", "IPKE", "IPGE", "CPUE", "BPEE", "UV22", "BPRE", "BPGE" };
+    static const char* order[] = { "IRBO", "IRAO", "IRBJ", "IRAJ", "IREO", "IRDO", "IPKE", "IPGE", "CPUE", "CPUJ", "BPEE", "UV22", "BPRE", "BPGE" };
     const int n = (int)(sizeof(order) / sizeof(order[0]));
     for (int i = 0; i < n; i++)
         if (code == order[i]) return i;

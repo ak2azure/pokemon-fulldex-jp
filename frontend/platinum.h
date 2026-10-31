@@ -106,7 +106,9 @@ struct PtFuncs
             if (fseek(f, 0x0C, SEEK_SET) != 0 || fread(code, 1, 4, f) != 4) code[0] = 0;
             fclose(f);
         }
-        on = !strcmp(code, "CPUE");
+        // (The Japanese Platinum, CPUJ: the same program, its table at its own addresses:
+        // tools/platinum/CPUJ.txt, made by tools/match_table.py.)
+        on = !strcmp(code, "CPUE") || !strcmp(code, "CPUJ");
         if (!on) return;
         auto find = [&](const char* name) {
             names.push_back(name);
