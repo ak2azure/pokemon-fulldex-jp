@@ -4,8 +4,9 @@
 
 - **The Japanese Pokémon Black (IRBJ)**, with everything the English one has: its screen
   layouts (the Japanese name entry and text too), the wider map and OTHER VERSION POKEMON. Its
-  save is `black-jp.sav`. The Japanese White (IRAJ) is recognised, and plays once its table is
-  made the same way (`tools/bw1/match_jp.py`, from an English Black and a Japanese White).
+  save is `black-jp.sav`.
+- **The Japanese Pokémon White (IRAJ)**, the same: its table made from the Japanese Black's
+  (`tools/bw1/match_jp.py --via-jp-black`). Its save is `white-jp.sav`.
 - **A new address: github.com/mamesj/pokemon-fulldex** (the old pokemon-ds-widescreen address
   still leads there). The bug report link, the PC download's `README.txt` and the Linux
   AppImage's updates use it.
