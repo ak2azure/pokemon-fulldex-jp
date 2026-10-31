@@ -152,17 +152,33 @@ bool portableLoaded = false;
 std::vector<std::vector<u8>> portableImages;
 std::vector<u32> chunkStart, chunkEnd;
 
-// A SoulSilver address in section `sec` as it is in the game being played.
-u32 Remap(u32 sec, u32 addr)
+// A section's move in the game being played: its overlay loaded at another address (the
+// Japanese games), given as a stretch from 0 to 0.
+u32 SectionMove(u32 sec)
 {
-    if (!portableGame) return addr;
+    if (!portableGame) return 0;
     const char* name = rc_sections[sec].name;
     for (unsigned i = 0; i < portableGame->numShifts; i++)
     {
         const RcPortableShift& sh = portableGame->shifts[i];
-        if (addr >= sh.from && addr < sh.to && !strcmp(sh.section, name)) return addr + sh.shift;
+        if (sh.from == 0 && sh.to == 0 && !strcmp(sh.section, name)) return (u32)sh.shift;
     }
-    return addr;
+    return 0;
+}
+
+// A SoulSilver address in section `sec` as it is in the game being played: the stretch's shift
+// (where the code moved within its overlay) and the overlay's own move.
+u32 Remap(u32 sec, u32 addr)
+{
+    if (!portableGame) return addr;
+    const char* name = rc_sections[sec].name;
+    const u32 move = SectionMove(sec);
+    for (unsigned i = 0; i < portableGame->numShifts; i++)
+    {
+        const RcPortableShift& sh = portableGame->shifts[i];
+        if (addr >= sh.from && addr < sh.to && !strcmp(sh.section, name)) return addr + sh.shift + move;
+    }
+    return addr + move;
 }
 
 void ChunkAddresses()
@@ -209,6 +225,14 @@ const char* rc_portable_load(const char code[4], const unsigned char* (*overlay)
         if (!data) { missing++; continue; }
         portableImages[s].assign(data, data + size);
         rc_sections[s].image = portableImages[s].data();
+        // (An overlay loaded at another address in this game, the Japanese ones: the section
+        // moves with it, SectionMove, so that its code is found at chunk addresses less its
+        // base. From the section's own base, kept the first time: a second game loaded keeps
+        // none of the first one's move.)
+        static std::vector<u32> ownBase;
+        if (ownBase.empty())
+            for (u32 k = 0; k < rc_num_sections; k++) ownBase.push_back(rc_sections[k].base);
+        rc_sections[s].base = ownBase[s] + SectionMove(s);
         // (An overlay can be a little longer in another game: HeartGold's title screen.)
         if (size > rc_sections[s].size) rc_sections[s].size = size;
         loaded++;
