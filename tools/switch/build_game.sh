@@ -172,6 +172,8 @@ all)
     ROMFS="$HERE/$BUILD/romfs"
     bw_tables "$ROMFS"
     cp tools/platinum/CPUE.txt "$ROMFS/funcs/CPUE.txt"
+    # (The Japanese Platinum: the same functions at its addresses, tools/match_table.py.)
+    cp tools/platinum/CPUJ.txt "$ROMFS/funcs/CPUJ.txt"
     # The HOME Menu entries' program (HOME MENU ICONS in the list's settings: frontend/switch_forwarder.cpp).
     say "The HOME Menu icons' loader (tools/switch/forwarder)"
     build bash tools/switch/build_forwarder.sh "$HERE/$BUILD/forwarder-build" "$ROMFS/forwarder"
@@ -343,6 +345,8 @@ platinum)
     ROMFS="$HERE/$BUILD/romfs"
     mkdir -p "$ROMFS/funcs"
     cp tools/platinum/CPUE.txt "$ROMFS/funcs/CPUE.txt"
+    # (The Japanese Platinum: the same functions at its addresses, tools/match_table.py.)
+    cp tools/platinum/CPUJ.txt "$ROMFS/funcs/CPUJ.txt"
     rm -f "$BUILD/icon.jpg"
     icon="${SSR_SWITCH_ICON_PLATINUM:-${SSR_SWITCH_ICON:-}}"
     [ -n "$icon" ] && install -D -m 644 "$icon" "$BUILD/icon.jpg"
