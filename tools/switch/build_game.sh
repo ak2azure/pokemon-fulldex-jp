@@ -155,7 +155,14 @@ all)
     # the SoulSilver ROM as for hgss) and the Black games' function tables in its romfs (as for bw).
     # It shows the list of the player's games when it starts (frontend/launcher.h).
     BUILD=build-switch-all
-    if [ -z "$ROM" ]; then
+    if [ -z "$ROM" ] && [ -f tools/soulsilver/tables/rc_tables.cpp ]; then
+        # Without the SoulSilver ROM, SoulSilver's tables as made from it once
+        # (tools/soulsilver/tables: tools/soulsilver/tables_only.py's output, addresses only),
+        # with the other games' shifts (HeartGold US, the Japanese SoulSilver and HeartGold).
+        say "SoulSilver's tables from tools/soulsilver/tables"
+        python3 tools/soulsilver/tables_only.py tools/soulsilver/tables build-gen-tables
+        GEN_TABLES="$HERE/build-gen-tables"
+    elif [ -z "$ROM" ]; then
         # Without the SoulSilver ROM: the Black games and Platinum only (Black 2's empty tables,
         # tools/bw2/stubgen, as for bw). The list then leaves SoulSilver and HeartGold out
         # (Playable in frontend/switch_platform.cpp: no recompiled code).
