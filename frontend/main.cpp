@@ -1790,13 +1790,14 @@ int main(int argc, char** argv)
     cfg.wideLines = 720;
 #endif
 #endif
+    if (!opt.headless) cfg.Load(opt.config);
 #ifdef SSR_PS5
     // The PS5 draws the widescreen world with the processor while the graphics chip shows a
-    // 3840x2160 picture, so a world of 2160 lines (WIDESCREEN RES at its highest) was asked for
-    // and the emulation waited 17 ms a frame for it: LOWER RES WHEN BUSY starts on there.
+    // 3840x2160 picture, so a world of 2160 lines (3D RESOLUTION at its highest) was asked for
+    // and the emulation waited 17 ms a frame for it; seven drawing threads would need about
+    // twice as many. LOWER RES WHEN BUSY is always on there, and not in the menus.
     cfg.autoDetail = true;
 #endif
-    if (!opt.headless) cfg.Load(opt.config);
     // RETROACHIEVEMENTS (achievements.h): the account logs in (when it is on) and this game's
     // achievements load as the game starts. Not in a test run (headless, lockstep).
     if (!opt.headless && !opt.lockstep && Achievements::Available())
@@ -4143,7 +4144,9 @@ int main(int argc, char** argv)
                 const int l = detailLines[detailIndex()];
                 add(M_WIDELINES, "3D RESOLUTION", std::to_string(l) + "P" + (l == 192 ? " (DS)" : l == 1440 ? " (2K)" : l == 2160 ? " (4K)" : ""));
             }
+#ifndef SSR_PS5 // (always on there; see where the settings are read)
             add(M_AUTODETAIL, "LOWER RES WHEN BUSY", onOff(cfg.autoDetail));
+#endif
 #endif
 #if SSR_WORLD_ON_GPU && !defined(__SWITCH__)
             // ON: the widescreen world drawn by the graphics card (OpenGL), not the processor.
