@@ -44,6 +44,7 @@
 #include "controls.h"
 #include "achievements.h"
 #include "ssr_os.h"
+#include "ps5.h"
 #if !defined(SSR_PHONE) && !defined(__SWITCH__)
 #include "shortcuts.h"
 #endif
@@ -405,10 +406,21 @@ int PickGame(Folders& fo, std::vector<Launcher::Game>& games, int selected, bool
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0)
     {
         fprintf(stderr, "[launcher] SDL_Init: %s\n", SDL_GetError());
+#ifdef SSR_PS5
+        Ps5::Notify("Pokemon Fulldex: SDL_Init: %s", SDL_GetError());
+#endif
         return -1;
     }
     SDL_Window* window = SDL_CreateWindow("Pokémon Fulldex", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, winW, winH,
         SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+#ifdef SSR_PS5
+    if (window && !Ps5::PrepareWindow(window))
+    {
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return -1;
+    }
+#endif
     SDL_Renderer* renderer = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC) : nullptr;
     if (window && !renderer) renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     if (!renderer)
@@ -1498,6 +1510,10 @@ bool Start(int& argc, char**& argv)
     }
     if (freopen(logPath.c_str(), "w", stderr)) setvbuf(stderr, nullptr, _IOLBF, 0);
     fprintf(stderr, "[launcher] folder %s\n", fo.dir.c_str());
+#ifdef SSR_PS5
+    Ps5::CloseAppAtExit();
+    Ps5::Notify("Pokemon Fulldex: starting (%s)", fo.dir.c_str());
+#endif
 
     std::map<std::string, std::vector<uint32_t>> artCache;
     std::vector<Launcher::Game> games = FindGames(fo, artCache);

@@ -13,8 +13,11 @@
 # as for the Switch's all-games download; the download holds nothing of the games.
 #
 # The result, build-ps5-dist/pokemon-fulldex-ps5.zip:
-#   pokemon-fulldex.elf          the payload, sent to elfldr (Payload Manager, PS5Upload, or
-#                                nc <PS5's address> 9021 < pokemon-fulldex.elf)
+#   homebrew/PokemonFulldex/     copied to /data/homebrew/PokemonFulldex on the PS5 and started
+#                                from websrv's homebrew list (ps5-payload-websrv): eboot.elf, the
+#                                payload, with its icon and homebrew.js. It runs as an application
+#                                there, which a payload needs to show its picture: sent straight
+#                                to elfldr, SDL could not open the video output.
 #   pokemon-ds-wide/             copied to /data/pokemon-ds-wide on the PS5 (FTP, ftpsrv): its
 #                                data/funcs holds the function tables, the ROMs go in its roms
 #
@@ -83,24 +86,29 @@ source "$PS5_PAYLOAD_SDK/toolchain/prospero.sh"
     -DSSR_PNG=OFF -DSSR_GPU3D=OFF -DSSR_PORTABLE_X86=ON -DSSR_GENERATED_DIR="$HERE/build-gen-tables" \
     -DCMAKE_VERBOSE_MAKEFILE=OFF >/dev/null
 ninja -C build-ps5 ssrecomp
-"$STRIP" -o build-ps5-dist/pokemon-fulldex.elf build-ps5/pokemon-fulldex.elf
+HB=build-ps5-dist/homebrew/PokemonFulldex
+mkdir -p "$HB/sce_sys"
+"$STRIP" -o "$HB/eboot.elf" build-ps5/pokemon-fulldex.elf
+cp tools/ps5/homebrew.js "$HB/homebrew.js"
+python3 tools/ps5/make_icon.py "$HB/sce_sys/icon0.png"
 cp LICENSE "$OUT/LICENSE.txt"
 cp tools/ps5/README.txt build-ps5-dist/README.txt
 
 # Only the payload, the tables, the notes and the empty folders: never a ROM, save or game code.
 (cd build-ps5-dist && find . -mindepth 1 | sed 's|^\./||' | python3 -c "
 import re, sys
-ok = re.compile(r'^(pokemon-fulldex\.elf|README\.txt|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
+ok = re.compile(r'^(README\.txt|homebrew(/PokemonFulldex(/(eboot\.elf|homebrew\.js|sce_sys|sce_sys/icon0\.png))?)?|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
 bad = [l for l in sys.stdin.read().split() if not ok.match(l)]
 if bad: sys.exit('unexpected files in the download: %s' % bad)
 ")
 (cd build-ps5-dist && rm -f pokemon-fulldex-ps5.zip && python3 -c "
 import os, zipfile
 with zipfile.ZipFile('pokemon-fulldex-ps5.zip', 'w', zipfile.ZIP_DEFLATED) as z:
-    for top in ('pokemon-fulldex.elf', 'README.txt'): z.write(top)
-    for root, dirs, files in os.walk('pokemon-ds-wide'):
-        dirs.sort()
-        z.writestr(zipfile.ZipInfo(root + '/'), '')
-        for f in sorted(files): z.write(os.path.join(root, f))
+    z.write('README.txt')
+    for top in ('homebrew', 'pokemon-ds-wide'):
+        for root, dirs, files in os.walk(top):
+            dirs.sort()
+            z.writestr(zipfile.ZipInfo(root + '/'), '')
+            for f in sorted(files): z.write(os.path.join(root, f))
 ")
 say "Done: $HERE/build-ps5-dist/pokemon-fulldex-ps5.zip"

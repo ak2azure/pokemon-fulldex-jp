@@ -311,6 +311,8 @@ else()
         # The PS5 payload: an ELF that elfldr loads (tools/ps5/build.sh).
         target_compile_definitions(ssrecomp PRIVATE SSR_PS5)
         set_target_properties(ssrecomp PROPERTIES OUTPUT_NAME pokemon-fulldex SUFFIX .elf)
+        # (sceSystemServiceLoadExec, which closes the homebrew application at the end: frontend/ps5.h.)
+        target_link_libraries(ssrecomp PRIVATE SceSystemService)
     elseif(UNIX AND NOT APPLE AND SSR_PC_ALL_GAMES)
         # The Linux download carries its own SDL2 beside the program (tools/pc/build_all.sh),
         # found there first: $ORIGIN, the program's folder.

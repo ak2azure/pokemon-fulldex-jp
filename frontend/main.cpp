@@ -31,6 +31,7 @@
 #else
 #include <SDL2/SDL.h>
 #endif
+#include "ps5.h"
 #if defined(__linux__) || defined(__SWITCH__) // (Android too)
 #include <unistd.h>
 #endif
@@ -1994,6 +1995,7 @@ int main(int argc, char** argv)
 #elif defined(SSR_PS5)
         // (The PS5: SDL's picture there is drawn by the processor; see pc_launcher.cpp.)
         SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+        if (window && !Ps5::PrepareWindow(window)) return 1;
 #elif !defined(_WIN32)
         if (!getenv("SDL_RENDER_DRIVER")) SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
 #endif
