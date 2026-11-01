@@ -1523,6 +1523,8 @@ bool Start(int& argc, char**& argv)
     setenv("SSR_PIPELINE", "1", 0);
     setenv("SSR_PERF", "1", 0);
     setenv("SSR_EMU_PROF", "1", 0);
+    // (The compositor shares the picture out between half of these: merged.h.)
+    fprintf(stderr, "[ps5] %u hardware threads\n", std::thread::hardware_concurrency());
 #endif
 
     std::map<std::string, std::vector<uint32_t>> artCache;

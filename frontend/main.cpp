@@ -3829,7 +3829,14 @@ int main(int argc, char** argv)
     SDL_Texture* mergedTex = nullptr;
     GpuCompositor* gpuCompose = nullptr;
     BattleWide battleWide;
+#ifdef SSR_PS5
+    // The PS5: SDL's only renderer there is the software one, which drew the GPU compositor's
+    // scaled pieces on one core (13-34 ms a frame at 1080p). The compositor of the headless
+    // tests shares the picture out between threads instead.
+    const bool cpuCompose = true;
+#else
     const bool cpuCompose = getenv("SSR_CPU_COMPOSE") != nullptr;
+#endif
     int mergedTexW = 0, mergedTexH = 0;
 
     // Test navigator (--nav): walks the player to a list of tiles, learning which moves
@@ -4493,11 +4500,15 @@ int main(int argc, char** argv)
             else
             {
                 int cw = j.outW, ch = j.outH;
+#ifndef SSR_PS5
+                // (Not on the PS5: there SDL's software renderer would scale it up again,
+                // which costs more than composing at the screen's size.)
                 if (cfg.smooth && j.outH > 768)
                 {
                     cw = j.outW * 768 / j.outH;
                     ch = 768;
                 }
+#endif
                 MergedCompose(j.scene, j.screens, cw, ch, mergedImage, cfg.smooth, &j.wide);
                 perfMark(3);
                 if (!mergedTex || mergedTexW != cw || mergedTexH != ch)
