@@ -48,20 +48,19 @@ inline void CloseAppAtExit()
 
 // Mesa's libraries (EGL, OpenGL ES, gallium's zink, RADV) are beside eboot.elf, where the
 // SDK's loader finds them through LD_LIBRARY_PATH (it reads it at each dlopen): the program's
-// own folder, from argv[0], and websrv's usual one.
+// own folder, from argv[0], else websrv's usual one. One folder only: the loader does not split
+// the list at its colons (crt/rtld.c tests the path being built for ':', not the list), so
+// "a:b" was looked in as a single folder and libEGL.so.1 was not found.
 inline void SetLibraryPath(const char* argv0)
 {
-    std::string dirs;
-    if (argv0 && strchr(argv0, '/'))
+    std::string dir = "/data/homebrew/PokemonFulldex";
+    if (argv0 && argv0[0] == '/' && strchr(argv0 + 1, '/'))
     {
-        dirs = argv0;
-        dirs.erase(dirs.find_last_of('/'));
-        dirs += ":";
+        dir = argv0;
+        dir.erase(dir.find_last_of('/'));
     }
-    dirs += "/data/homebrew/PokemonFulldex";
-    if (const char* old = getenv("LD_LIBRARY_PATH"); old && *old) dirs += std::string(":") + old;
-    setenv("LD_LIBRARY_PATH", dirs.c_str(), 1);
-    fprintf(stderr, "[ps5] started as %s; libraries from %s\n", argv0 ? argv0 : "?", dirs.c_str());
+    setenv("LD_LIBRARY_PATH", dir.c_str(), 1);
+    fprintf(stderr, "[ps5] started as %s; libraries from %s\n", argv0 ? argv0 : "?", dir.c_str());
 }
 
 // The game drawn by the graphics chip (SDL's OpenGL ES 2 renderer on Mesa) unless
