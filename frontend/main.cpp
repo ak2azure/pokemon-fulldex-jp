@@ -4571,19 +4571,24 @@ int main(int argc, char** argv)
         }
         if (j.overlayUsed)
         {
-            if (!overlayTex || overlayTexW != j.outW || overlayTexH != j.outH)
+            // (The canvas may be smaller than the picture, a whole number of times: enlarged here
+            // with its pixels kept square-edged.)
+            if (!overlayTex || overlayTexW != canvas.w || overlayTexH != canvas.h)
             {
                 if (overlayTex) SDL_DestroyTexture(overlayTex);
-                overlayTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, j.outW, j.outH);
+                overlayTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, canvas.w, canvas.h);
                 SDL_SetTextureBlendMode(overlayTex, SDL_BLENDMODE_BLEND);
-                overlayTexW = j.outW;
-                overlayTexH = j.outH;
+                SDL_SetTextureScaleMode(overlayTex, SDL_ScaleModeNearest);
+                overlayTexW = canvas.w;
+                overlayTexH = canvas.h;
             }
             if (canvas.Dirty())
             {
                 const SDL_Rect dr = { canvas.x0d, canvas.y0d, canvas.x1d - canvas.x0d, canvas.y1d - canvas.y0d };
-                SDL_UpdateTexture(overlayTex, &dr, canvas.px.data() + (size_t)dr.y * j.outW + dr.x, j.outW * 4);
-                SDL_RenderCopy(renderer, overlayTex, &dr, &dr);
+                SDL_UpdateTexture(overlayTex, &dr, canvas.px.data() + (size_t)dr.y * canvas.w + dr.x, canvas.w * 4);
+                const int k = canvas.w > 0 ? std::max(1, j.outW / canvas.w) : 1;
+                const SDL_Rect sr = { dr.x * k, dr.y * k, dr.w * k, dr.h * k };
+                SDL_RenderCopy(renderer, overlayTex, &dr, &sr);
             }
         }
         // In a window, screenshots are read back from the renderer: exactly what is shown.
@@ -4863,6 +4868,12 @@ int main(int argc, char** argv)
             // changes: the left part of the box back, the rest forward); a tap beside the box
             // closes the menu.
             auto menuTap = [&](float fx, float fy) {
+                // (In the overlay's pixels, which may be fewer than the picture's: see canvas.Resize.)
+                if (canvas.w > 0 && canvas.w < outW)
+                {
+                    fx = fx * canvas.w / outW;
+                    fy = fy * canvas.h / outH;
+                }
                 const int item = menu.ItemAt((int)fx, (int)fy);
                 if (item == -2) nav.back = true;
                 else if (item >= 0)
@@ -6770,19 +6781,27 @@ int main(int argc, char** argv)
         }
 
         sceneMark(2);
-        // Overlay: touch cursor, status message, pause menu.
+        // Overlay: touch cursor, status message, pause menu. On the PS5's 3840x2160 picture it is
+        // drawn at half the size and doubled when shown (by the graphics chip): at full size the
+        // pause menu's box and its letters, 9 pixels to a dot, took the processor 24 ms a frame.
+#ifdef SSR_PS5
+        const int ovDiv = outH >= 2000 ? 2 : 1;
+#else
+        const int ovDiv = 1;
+#endif
+        const int ovW = outW / ovDiv, ovH = outH / ovDiv;
         bool overlayUsed = false;
-        canvas.Resize(outW, outH);
+        canvas.Resize(ovW, ovH);
         canvas.Clear();
         const SDL_Rect cursorRect = merged
-            ? SDL_Rect { (int)view.originX, (int)view.originY, (int)(256 * view.unit), (int)(192 * view.unit) }
-            : rects[1];
+            ? SDL_Rect { (int)view.originX / ovDiv, (int)view.originY / ovDiv, (int)(256 * view.unit) / ovDiv, (int)(192 * view.unit) / ovDiv }
+            : SDL_Rect { rects[1].x / ovDiv, rects[1].y / ovDiv, rects[1].w / ovDiv, rects[1].h / ovDiv };
         if (frame < cursorShownUntil && cursorRect.w > 0 && !paused)
         {
             int cx = cursorRect.x + (int)(cursorX * cursorRect.w / 256);
             int cy = cursorRect.y + (int)(cursorY * cursorRect.h / 192);
             int arm = cursorRect.w / 40 + 3;
-            int t = outH / 360 + 1;
+            int t = ovH / 360 + 1;
             canvas.Fill(cx - arm - 1, cy - t - 1, arm * 2 + 3, t * 2 + 3, 0xFF000000);
             canvas.Fill(cx - t - 1, cy - arm - 1, t * 2 + 3, arm * 2 + 3, 0xFF000000);
             canvas.Fill(cx - arm, cy - t, arm * 2 + 1, t * 2 + 1, curPress ? 0xFFFFD75E : 0xFFFFFFFF);
@@ -6791,21 +6810,21 @@ int main(int argc, char** argv)
         }
         // The top right corner, below the on-screen R button when those controls are shown
         // (their top row ends at 12% of the height).
-        int cornerY = touchPadUsed && touchPad.visible ? outH * 13 / 100 : 0;
+        int cornerY = touchPadUsed && touchPad.visible ? ovH * 13 / 100 : 0;
         if (cfg.showFps && !opt.headless)
         {
-            int sc = outH / 240 < 1 ? 1 : outH / 240;
+            int sc = ovH / 240 < 1 ? 1 : ovH / 240;
             const std::string text = std::to_string(shownFps) + " FPS";
             const int tw = Canvas::TextWidth(text, sc) + 8 * sc;
-            canvas.Fill(outW - tw, cornerY, tw, 13 * sc, 0xC0000000);
-            canvas.Text(outW - tw + 4 * sc, cornerY + 3 * sc, text, sc, 0xFFFFFFFF);
+            canvas.Fill(ovW - tw, cornerY, tw, 13 * sc, 0xC0000000);
+            canvas.Text(ovW - tw + 4 * sc, cornerY + 3 * sc, text, sc, 0xFFFFFFFF);
             cornerY += 13 * sc;
             overlayUsed = true;
         }
         if (speed > 1)
         {
-            int sc = outH / 240 < 1 ? 1 : outH / 240;
-            canvas.Text(outW - Canvas::TextWidth(">>", sc) - 4 * sc, cornerY + 4 * sc, ">>", sc, 0xFFFFFFFF);
+            int sc = ovH / 240 < 1 ? 1 : ovH / 240;
+            canvas.Text(ovW - Canvas::TextWidth(">>", sc) - 4 * sc, cornerY + 4 * sc, ">>", sc, 0xFFFFFFFF);
             overlayUsed = true;
         }
 #if defined(__ANDROID__) && !defined(SSR_PC_LAUNCHER)
@@ -6829,8 +6848,8 @@ int main(int argc, char** argv)
             const float w = SHOES_W * sc, h = SHOES_H * sc;
             const float x = panel.dx - w - 6, y = panel.dy + 192 * sc - h - 14;
             shoesRect[0] = x; shoesRect[1] = y; shoesRect[2] = w; shoesRect[3] = h;
-            const int ox = (int)(view.originX + x * view.unit), oy = (int)(view.originY + y * view.unit);
-            const int ow = (int)(w * view.unit), oh = (int)(h * view.unit);
+            const int ox = (int)(view.originX + x * view.unit) / ovDiv, oy = (int)(view.originY + y * view.unit) / ovDiv;
+            const int ow = (int)(w * view.unit) / ovDiv, oh = (int)(h * view.unit) / ovDiv;
             for (int py = 0; py < oh; py++)
             {
                 const int sy = std::min(SHOES_H - 1, py * SHOES_H / std::max(1, oh));
@@ -6840,7 +6859,7 @@ int main(int argc, char** argv)
                     canvas.Fill(ox + px, oy + py, 1, 1, shoesPix[sy * SHOES_W + sx]);
                 }
             }
-            const int tsc = std::max(1, outH / 360);
+            const int tsc = std::max(1, ovH / 360);
             const std::string label = std::string(pads.Empty() ? Controls::KeyName(cfg.controls.Key(Controls::Y))
                 : Controls::InputName(cfg.controls.Pad(Controls::Y, cfg.byLabel), Controls::StyleOf(pads.controllers.empty() ? nullptr : pads.controllers[0])))
                 + ": RUN " + (shoesOn ? "ON" : "OFF");
@@ -6851,12 +6870,12 @@ int main(int argc, char** argv)
         }
         if (frame < toastUntil)
         {
-            int sc = outH / 240 < 1 ? 1 : outH / 240;
+            int sc = ovH / 240 < 1 ? 1 : ovH / 240;
             const int tw = Canvas::TextWidth(toast, sc) + 8 * sc;
             // With on-screen controls, centred below their top row (L, MENU and R end at
             // 12% of the height) instead of under the L button.
             const bool controls = touchPadUsed && touchPad.visible;
-            const int tx = controls ? (outW - tw) / 2 : 0, ty = controls ? outH * 13 / 100 : 0;
+            const int tx = controls ? (ovW - tw) / 2 : 0, ty = controls ? ovH * 13 / 100 : 0;
             canvas.Fill(tx, ty, tw, 13 * sc, 0xC0000000);
             canvas.Text(tx + 4 * sc, ty + 3 * sc, toast, sc, 0xFFFFFFFF);
             overlayUsed = true;
