@@ -70,7 +70,9 @@
   - 対応: `frontend/ps5.h`（画面の隅の通知 sceKernelSendNotificationRequest、SDL_GetWindowSurface を先に呼んで本当のエラーを出す、FRAMEBUFFER_ACCELERATION=0、終了時 sceSystemServiceLoadExec("exit")）。配布物は `homebrew/PokemonFulldex/`（eboot.elf、homebrew.js、sce_sys/icon0.png は tools/ps5/make_icon.py で生成）＋ `pokemon-ds-wide/`。
   - websrv（Homebrew Launcher v0.34）から起動すると VideoOut は開けた。ただし SDL 2.28 以降は、ウィンドウに画面バッファがあるとレンダラーを作らない（"Surface already associated with window"）。そのため PrepareWindow は確認後に SDL_DestroyWindowSurface する。
   - **ゲーム一覧の表示まで実機で確認（11/2）。** 起動後、ランチャーのダイアログを○で閉じると見える。
-- 未確認・今後: ゲームの起動と動作、速度（インタプリタで重い可能性）、終了後リストへ戻る方法、JIT（sceKernelJitCreateSharedMemory 等）。
+  - 速度（ブラック、1080p）: 最初は30fps・ゲーム速度半分。PS5 の SDL の表示はフリップを待つので、パイプライン（SSR_PIPELINE）をオンにした。合成は GPU合成（software renderer で 1080p を1コア処理、13〜34ms）をやめて CPU合成（merged.h、複数スレッド、画面サイズのまま）にし、2〜3.5ms になった。残りはエミュレーション（インタプリタ）16.4〜17ms。
+  - `-march=znver2` は効果なし（clang の PS5 ターゲットは最初から znver2）。SSR_EMU_PROF は GPU3D::Run ごとに時刻を読むので切った。効果は未確認。
+- 未確認・今後: 速度（エミュレーションがぎりぎり）（インタプリタで重い可能性）、終了後リストへ戻る方法、JIT（sceKernelJitCreateSharedMemory 等）。
 
 ## ROMの場所（ユーザーPC）
 
