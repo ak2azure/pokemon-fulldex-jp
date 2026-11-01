@@ -1790,6 +1790,12 @@ int main(int argc, char** argv)
     cfg.wideLines = 720;
 #endif
 #endif
+#ifdef SSR_PS5
+    // The PS5 draws the widescreen world with the processor while the graphics chip shows a
+    // 3840x2160 picture, so a world of 2160 lines (WIDESCREEN RES at its highest) was asked for
+    // and the emulation waited 17 ms a frame for it: LOWER RES WHEN BUSY starts on there.
+    cfg.autoDetail = true;
+#endif
     if (!opt.headless) cfg.Load(opt.config);
     // RETROACHIEVEMENTS (achievements.h): the account logs in (when it is on) and this game's
     // achievements load as the game starts. Not in a test run (headless, lockstep).
