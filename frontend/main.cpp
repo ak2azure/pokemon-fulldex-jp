@@ -1975,15 +1975,25 @@ int main(int argc, char** argv)
         gameTitle = PcLauncher::GameName();
         if (!gameTitle.empty()) windowTitle = gameTitle.c_str();
 #endif
+#ifdef SSR_PS5
+        // (The graphics chip: Mesa loaded first and the window made for OpenGL; frontend/ps5.h.)
+        bool ps5Gpu = Ps5::UseGpu() && Ps5::LoadGpu();
+        window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h,
+            SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN_DESKTOP | (ps5Gpu ? SDL_WINDOW_OPENGL : 0));
+        if (!window && ps5Gpu)
+        {
+            Ps5::Notify("Pokemon Fulldex: graphics chip: no OpenGL window (%s)", SDL_GetError());
+            ps5Gpu = false;
+            window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h,
+                SDL_WINDOW_RESIZABLE | SDL_WINDOW_FULLSCREEN_DESKTOP);
+        }
+#else
         window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
             w, h,
             SDL_WINDOW_RESIZABLE |
 #ifdef __APPLE__
             SDL_WINDOW_ALLOW_HIGHDPI |
 #endif
-#ifdef SSR_PS5
-            SDL_WINDOW_FULLSCREEN_DESKTOP);
-#else
             (cfg.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
 #endif
         // The OpenGL ES renderer uploads the picture several times faster than SDL's default
@@ -1996,7 +2006,7 @@ int main(int argc, char** argv)
         // The PS5: the graphics chip draws the game (OpenGL ES through Mesa, the whole
         // 3840x2160 screen) unless SSR_PS5_SOFTWARE is set; if it cannot, the processor's
         // picture below, as the game list has (pc_launcher.cpp).
-        if (Ps5::UseGpu()) SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
+        if (ps5Gpu && window && Ps5::TestGpuContext(window)) SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
         else
         {
             SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");

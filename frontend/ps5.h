@@ -71,6 +71,46 @@ inline bool UseGpu()
     return !getenv("SSR_PS5_SOFTWARE");
 }
 
+// SDL's OpenGL ES 2 renderer says only "Couldn't find matching render driver" when anything
+// on its way fails, so the way is walked here first, a step at a time, each saying why it
+// failed: Mesa loaded (before the window, which is then made for OpenGL), then a context made
+// in that window (which also shows what Mesa drives) and let go again for the renderer's own.
+inline bool LoadGpu()
+{
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    if (SDL_GL_LoadLibrary(nullptr) == 0)
+    {
+        fprintf(stderr, "[ps5] graphics chip: Mesa loaded\n");
+        return true;
+    }
+    Notify("Pokemon Fulldex: graphics chip: Mesa not loaded (%s)", SDL_GetError());
+    return false;
+}
+
+inline bool TestGpuContext(SDL_Window* window)
+{
+    SDL_GLContext ctx = SDL_GL_CreateContext(window);
+    if (!ctx)
+    {
+        Notify("Pokemon Fulldex: graphics chip: no OpenGL ES context (%s)", SDL_GetError());
+        return false;
+    }
+    using GetString = const unsigned char* (*)(unsigned);
+    if (auto getString = reinterpret_cast<GetString>(SDL_GL_GetProcAddress("glGetString")))
+    {
+        const unsigned char* version = getString(0x1F02); // GL_VERSION
+        const unsigned char* name = getString(0x1F01);    // GL_RENDERER
+        fprintf(stderr, "[ps5] graphics chip: %s, %s\n", version ? (const char*)version : "?", name ? (const char*)name : "?");
+    }
+    int w = 0, h = 0;
+    SDL_GL_GetDrawableSize(window, &w, &h);
+    fprintf(stderr, "[ps5] graphics chip: the picture is %dx%d\n", w, h);
+    SDL_GL_DeleteContext(ctx);
+    return true;
+}
+
 // Whether melonDS's JIT can run here: code made at run time needs memory that can be written
 // and then run, which ps5-payload-sdk's libc asks the kernel for (mmap and mprotect with
 // PROT_EXEC: kernel_mprotect). A page is asked for and a return instruction run in it; if
