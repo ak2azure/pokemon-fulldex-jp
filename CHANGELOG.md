@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **PS5 (test version)**: the all-games program as a payload for a jailbroken PS5's ELF loader,
+  with the game list, the widescreen view and the Japanese menus. For now the picture is drawn by
+  the processor and the games run without a JIT. See the README.txt in its download.
 - **The Japanese Pokémon Black (IRBJ)**, with everything the English one has: its screen
   layouts (the Japanese name entry and text too), the wider map and OTHER VERSION POKEMON. Its
   save is `black-jp.sav`.

@@ -41,6 +41,17 @@ set(ENABLE_GDBSTUB OFF CACHE BOOL "" FORCE)
 set(ENABLE_LTO_RELEASE OFF CACHE BOOL "" FORCE)
 add_subdirectory(melonDS EXCLUDE_FROM_ALL)
 
+# PS5 homebrew (a payload for elfldr): built with ps5-payload-sdk's toolchain file
+# (toolchain/prospero.cmake), which sets PS5. See tools/ps5/build.sh.
+if(PS5)
+    set(SSR_PS5 ON)
+    # (FatFs asks for POSIX.1-1990 before including time.h, which on FreeBSD hides
+    # localtime_r: time.h included first, as it is.)
+    set_property(SOURCE melonDS/src/fatfs/ffsystem.c DIRECTORY melonDS/src APPEND PROPERTY COMPILE_OPTIONS -include time.h)
+else()
+    set(SSR_PS5 OFF)
+endif()
+
 # Nintendo Switch homebrew: built with devkitPro's toolchain file ($DEVKITPRO/cmake/Switch.cmake),
 # which sets NINTENDO_SWITCH. See tools/switch/build.sh.
 if(NINTENDO_SWITCH OR CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
@@ -296,7 +307,11 @@ else()
         target_sources(ssrecomp PRIVATE frontend/pc_launcher.cpp)
         target_compile_definitions(ssrecomp PRIVATE SSR_PC_LAUNCHER)
     endif()
-    if(UNIX AND NOT APPLE AND SSR_PC_ALL_GAMES)
+    if(SSR_PS5)
+        # The PS5 payload: an ELF that elfldr loads (tools/ps5/build.sh).
+        target_compile_definitions(ssrecomp PRIVATE SSR_PS5)
+        set_target_properties(ssrecomp PROPERTIES OUTPUT_NAME pokemon-fulldex SUFFIX .elf)
+    elseif(UNIX AND NOT APPLE AND SSR_PC_ALL_GAMES)
         # The Linux download carries its own SDL2 beside the program (tools/pc/build_all.sh),
         # found there first: $ORIGIN, the program's folder.
         set_target_properties(ssrecomp PROPERTIES BUILD_RPATH "$ORIGIN")
