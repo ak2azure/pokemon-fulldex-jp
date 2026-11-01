@@ -68,7 +68,9 @@
   - PS5 の SDL2（pacbrew の ps5-payload-sdl2、Mesa パッチ入り）の render driver は software だけ。software は画面バッファを作るときに VideoOut を開く（sceVideoOutOpen、直接メモリ）。そこで失敗しているが、SDL が本当のエラーを上書きする。
   - SDL アプリ（offact など）は `/data/homebrew/<名前>/eboot.elf` に置き、websrv のホームブリュー一覧から起動する前提。elfldr に直接送ると画面を持てないと判断。
   - 対応: `frontend/ps5.h`（画面の隅の通知 sceKernelSendNotificationRequest、SDL_GetWindowSurface を先に呼んで本当のエラーを出す、FRAMEBUFFER_ACCELERATION=0、終了時 sceSystemServiceLoadExec("exit")）。配布物は `homebrew/PokemonFulldex/`（eboot.elf、homebrew.js、sce_sys/icon0.png は tools/ps5/make_icon.py で生成）＋ `pokemon-ds-wide/`。
-- 未確認・今後: websrv からの起動、速度（インタプリタで重い可能性）、終了後リストへ戻る方法、JIT（sceKernelJitCreateSharedMemory 等）。
+  - websrv（Homebrew Launcher v0.34）から起動すると VideoOut は開けた。ただし SDL 2.28 以降は、ウィンドウに画面バッファがあるとレンダラーを作らない（"Surface already associated with window"）。そのため PrepareWindow は確認後に SDL_DestroyWindowSurface する。
+  - **ゲーム一覧の表示まで実機で確認（11/2）。** 起動後、ランチャーのダイアログを○で閉じると見える。
+- 未確認・今後: ゲームの起動と動作、速度（インタプリタで重い可能性）、終了後リストへ戻る方法、JIT（sceKernelJitCreateSharedMemory 等）。
 
 ## ROMの場所（ユーザーPC）
 
