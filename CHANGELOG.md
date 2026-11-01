@@ -4,7 +4,8 @@
 
 - **PS5 (test version)**: the all-games program as homebrew for a jailbroken PS5, started from
   ps5-payload-websrv's homebrew list, with the game list, the widescreen view and the Japanese
-  menus. For now the picture is drawn by the processor and the games run without a JIT. If it
+  menus. For now the picture is drawn by the processor; the games run on the JIT (without fast
+  memory), or on the interpreter where the console does not allow it. If it
   cannot start, a notification on the screen says why. See the README.txt in its download.
 - **The Japanese Pokémon Black (IRBJ)**, with everything the English one has: its screen
   layouts (the Japanese name entry and text too), the wider map and OTHER VERSION POKEMON. Its

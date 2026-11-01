@@ -22,7 +22,8 @@
 #                                data/funcs holds the function tables, the ROMs go in its roms
 #
 # The PS5's picture is drawn by its processor (SDL's PS5 video driver), and the games run on
-# melonDS's interpreter (no JIT): see frontend/ssr_os.h, SSR_PS5.
+# melonDS's JIT without fast memory, or its interpreter if the kernel does not let the payload
+# run code it makes (frontend/ps5.h, CanRunJit).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -82,7 +83,7 @@ cp tools/platinum/CPUE.txt tools/platinum/CPUJ.txt "$FUNCS/"
 say "Compiling for the PS5"
 # (The toolchain file sets PS5, which makes CMakeLists.txt build the payload: SSR_PS5.)
 source "$PS5_PAYLOAD_SDK/toolchain/prospero.sh"
-"$CMAKE" -S . -B build-ps5 -G Ninja -DCMAKE_BUILD_TYPE=Release -DSSR_JIT=OFF -DSSR_PC_ALL_GAMES=ON \
+"$CMAKE" -S . -B build-ps5 -G Ninja -DCMAKE_BUILD_TYPE=Release -DSSR_JIT=ON -DSSR_PC_ALL_GAMES=ON \
     -DSSR_PNG=OFF -DSSR_GPU3D=OFF -DSSR_PORTABLE_X86=ON -DSSR_GENERATED_DIR="$HERE/build-gen-tables" \
     -DCMAKE_VERBOSE_MAKEFILE=OFF >/dev/null
 ninja -C build-ps5 ssrecomp

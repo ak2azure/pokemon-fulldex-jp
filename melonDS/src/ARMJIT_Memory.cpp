@@ -38,6 +38,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+#include <string.h>
 #endif
 
 #if defined(__ANDROID__)
@@ -737,6 +738,11 @@ bool ARMJIT_Memory::IsFastMemSupported()
     return SwitchFastMem;
 #elif defined(__APPLE__) || defined(__OpenBSD__)
     return false;
+#elif defined(__PROSPERO__)
+    // (The PS5: no fast memory, see the constructor; the page size is still used to track code.)
+    PageSize = RegularPageSize;
+    PageShift = __builtin_ctz(PageSize);
+    return false;
 #else
     static bool initialised = false;
     static bool isSupported = false;
@@ -761,7 +767,7 @@ bool ARMJIT_Memory::IsFastMemSupported()
 
 void ARMJIT_Memory::RegisterFaultHandler()
 {
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__PROSPERO__)
 #elif defined(_WIN32)
     ExceptionHandlerHandle = AddVectoredExceptionHandler(1, ExceptionHandler);
 
@@ -791,7 +797,7 @@ void ARMJIT_Memory::RegisterFaultHandler()
 
 void ARMJIT_Memory::UnregisterFaultHandler()
 {
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__PROSPERO__)
 #elif defined(_WIN32)
     if (ExceptionHandlerHandle)
     {
@@ -869,6 +875,13 @@ ARMJIT_Memory::ARMJIT_Memory(melonDS::NDS& nds) : NDS(nds)
         // old Windows version
         MemoryBase = new u8[MemoryTotalSize];
     }
+#elif defined(__PROSPERO__)
+    // ssrecomp: the PS5 (a payload) runs the JIT without fast memory, the DS's memory a plain
+    // buffer: no shared memory object mapped into an 8 GB reservation, nor a SIGSEGV handler,
+    // which the PS5's kernel may not allow a payload. Without fast memory nothing is ever
+    // mapped (Mappings stay empty), so the functions that map, unmap and protect are not used.
+    MemoryBase = (u8*)aligned_alloc(0x4000, MemoryTotalSize);
+    memset(MemoryBase, 0, MemoryTotalSize);
 #else
     MemoryBase = (u8*)mmap(nullptr, VirtmemAreaSize, PROT_NONE, MAP_ANON | MAP_PRIVATE, -1, 0);
 
@@ -951,6 +964,9 @@ ARMJIT_Memory::~ARMJIT_Memory() noexcept
     {
         delete[] MemoryBase;
     }
+#elif defined(__PROSPERO__)
+    free(MemoryBase);
+    MemoryBase = nullptr;
 #else
     if (MemoryBase)
     {

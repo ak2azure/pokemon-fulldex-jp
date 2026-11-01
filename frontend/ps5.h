@@ -3,10 +3,12 @@
 // picture. Included after SDL; only the PS5 build uses it.
 #ifdef SSR_PS5
 
+#include <cerrno>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sys/mman.h>
 
 extern "C" {
 // (As ps5-payload-sdk's samples declare them: libkernel and libSceSystemService.)
@@ -41,6 +43,25 @@ inline void Notify(const char* fmt, ...)
 inline void CloseAppAtExit()
 {
     atexit([] { sceSystemServiceLoadExec("exit", nullptr); });
+}
+
+// Whether melonDS's JIT can run here: code made at run time needs memory that can be written
+// and then run, which ps5-payload-sdk's libc asks the kernel for (mmap and mprotect with
+// PROT_EXEC: kernel_mprotect). A page is asked for and a return instruction run in it; if
+// that fails the games keep to the interpreter rather than crash.
+inline bool CanRunJit()
+{
+    void* page = mmap(nullptr, 0x4000, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (page == MAP_FAILED)
+    {
+        fprintf(stderr, "[ps5] JIT: no memory that can run code (%s): the interpreter\n", strerror(errno));
+        return false;
+    }
+    static_cast<unsigned char*>(page)[0] = 0xC3; // ret
+    reinterpret_cast<void (*)()>(page)();
+    munmap(page, 0x4000);
+    fprintf(stderr, "[ps5] JIT: code can be made and run\n");
+    return true;
 }
 
 // Before the software renderer: the window's picture, which opens the PS5's video output.

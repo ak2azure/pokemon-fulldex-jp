@@ -6,7 +6,7 @@
 //              folder picker and Java calls, the check for a newer release) stays __ANDROID__.
 //   SSR_PS5    a PS5 payload (tools/ps5/build.sh, set by CMakeLists.txt): the all-games program
 //              for elfldr, its folder /data/pokemon-ds-wide, SDL's own PS5 drivers (a picture
-//              drawn by the processor, the controller, the sound) and no JIT.
+//              drawn by the processor, the controller, the sound) and the JIT without fast memory.
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #if TARGET_OS_IPHONE

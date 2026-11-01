@@ -1599,9 +1599,12 @@ bool Start(int& argc, char**& argv)
         game.saveName.c_str());
     g_args = { argc > 0 && argv[0] ? argv[0] : "pokemon-ds-wide", game.rom, "--save", fo.saves + "/" + game.saveName,
                "--config", fo.cfg };
-#if !defined(SSR_IOS) && !defined(SSR_PS5)
-    // (melonDS's JIT; iOS lets no app make code as it runs, so there the interpreter plays. The
-    // PS5's payloads cannot either, as far as is known: the interpreter there too.)
+#if defined(SSR_PS5)
+    // (The PS5: melonDS's JIT without fast memory, when the kernel lets the payload run code
+    // it makes; otherwise the interpreter. SSR_PS5_INTERP=1 keeps to the interpreter.)
+    if (!getenv("SSR_PS5_INTERP") && Ps5::CanRunJit()) g_args.push_back("--jit");
+#elif !defined(SSR_IOS)
+    // (melonDS's JIT; iOS lets no app make code as it runs, so there the interpreter plays.)
     g_args.push_back("--jit");
 #endif
     // SoulSilver and HeartGold take their layouts from the program's own tables and must not be
