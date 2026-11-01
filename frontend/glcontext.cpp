@@ -144,9 +144,10 @@ bool SsrCreateGLContext(std::string& info)
     if (!LoadEgl(info)) return false;
 #endif
     // A display without a window: Mesa's surfaceless platform where there is one (a PC
-    // without a desktop, as in the headless tests), otherwise the default display.
+    // without a desktop, as in the headless tests), otherwise the default display. (The PS5's
+    // Mesa has only the screen's platform, videoout.)
     EGLDisplay display = EGL_NO_DISPLAY;
-#ifndef __SWITCH__
+#if !defined(__SWITCH__) && !defined(SSR_PS5)
     auto getPlatformDisplay = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
     const char* clientExt = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
     if (getPlatformDisplay && clientExt && strstr(clientExt, "EGL_MESA_platform_surfaceless"))
