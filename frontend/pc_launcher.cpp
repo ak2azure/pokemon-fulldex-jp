@@ -396,6 +396,12 @@ int PickGame(Folders& fo, std::vector<Launcher::Game>& games, int selected, bool
     SDL_SetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON, "1");
     SDL_SetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL, "1");
     #endif
+#ifdef SSR_PS5
+    // (SDL's PS5 picture is one the processor draws, shown full screen: its OpenGL ES, from
+    // Mesa, is drawn by the processor too, more slowly.)
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+    fullscreen = true;
+#endif
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0)
     {
         fprintf(stderr, "[launcher] SDL_Init: %s\n", SDL_GetError());
@@ -1450,6 +1456,13 @@ bool Start(int& argc, char**& argv)
         for (size_t i = 1; i <= fo.dir.size(); i++) // (each folder on the way, as mkdir -p)
             if (i == fo.dir.size() || fo.dir[i] == '/') MakeDir(fo.dir.substr(0, i));
     }
+#elif defined(SSR_PS5)
+    // The PS5: a payload has no folder of its own (elfldr is sent it over the network), so
+    // everything is in /data/pokemon-ds-wide on the console's storage, which an FTP server
+    // payload (ftpsrv) can reach: the function tables in its data/funcs, the ROMs in roms.
+    fo.dir = "/data/pokemon-ds-wide";
+    MakeDir(fo.dir);
+    fo.funcs = fo.dir + "/data/funcs";
 #elif !defined(_WIN32)
     // From an AppImage (the Linux download for Gear Lever and the like): the program's folder is
     // the AppImage's own, read-only, so the ROMs, saves and settings are in the user's data
@@ -1557,8 +1570,9 @@ bool Start(int& argc, char**& argv)
         game.saveName.c_str());
     g_args = { argc > 0 && argv[0] ? argv[0] : "pokemon-ds-wide", game.rom, "--save", fo.saves + "/" + game.saveName,
                "--config", fo.cfg };
-#ifndef SSR_IOS
-    // (melonDS's JIT; iOS lets no app make code as it runs, so there the interpreter plays.)
+#if !defined(SSR_IOS) && !defined(SSR_PS5)
+    // (melonDS's JIT; iOS lets no app make code as it runs, so there the interpreter plays. The
+    // PS5's payloads cannot either, as far as is known: the interpreter there too.)
     g_args.push_back("--jit");
 #endif
     // SoulSilver and HeartGold take their layouts from the program's own tables and must not be
@@ -1603,6 +1617,9 @@ void Finish()
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
     }
+#elif defined(SSR_PS5)
+    // (A payload cannot start itself again: the program ends, and is sent again for the list.)
+    return;
 #elif defined(__APPLE__)
     char self[4096];
     uint32_t size = sizeof self;

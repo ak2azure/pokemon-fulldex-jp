@@ -1980,13 +1980,20 @@ int main(int argc, char** argv)
 #ifdef __APPLE__
             SDL_WINDOW_ALLOW_HIGHDPI |
 #endif
+#ifdef SSR_PS5
+            SDL_WINDOW_FULLSCREEN_DESKTOP);
+#else
             (cfg.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+#endif
         // The OpenGL ES renderer uploads the picture several times faster than SDL's default
         // (desktop OpenGL) on the machines this was measured on. SDL_RENDER_DRIVER overrides.
         // Not on Windows: there OpenGL ES can come with a framebuffer that converts to sRGB,
         // which washes the colours out (seen on AMD), and SDL's default is Direct3D anyway.
 #if defined(__APPLE__)
         if (!getenv("SDL_RENDER_DRIVER")) SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
+#elif defined(SSR_PS5)
+        // (The PS5: SDL's picture there is drawn by the processor; see pc_launcher.cpp.)
+        SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 #elif !defined(_WIN32)
         if (!getenv("SDL_RENDER_DRIVER")) SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
 #endif
