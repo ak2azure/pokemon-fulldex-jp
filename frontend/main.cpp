@@ -5321,10 +5321,17 @@ int main(int argc, char** argv)
         heldNow.down = ps.btn[PAD_DOWN] || ps.ly > 0.5f;
         heldNow.left = ps.btn[PAD_LEFT] || ps.lx < -0.5f;
         heldNow.right = ps.btn[PAD_RIGHT] || ps.lx > 0.5f;
+        // Up and down held repeat, as in the game list (pc_launcher.cpp): once at once, then every
+        // third frame after eight, so a long menu is crossed quickly. Left and right, which change
+        // a setting, stay one press at a time.
+        static int heldUpFrames = 0, heldDownFrames = 0;
+        heldUpFrames = menu.open && heldNow.up ? heldUpFrames + 1 : 0;
+        heldDownFrames = menu.open && heldNow.down ? heldDownFrames + 1 : 0;
+        auto repeatDue = [](int frames) { return frames > 8 && frames % 3 == 0; };
         if (menu.open)
         {
-            nav.up |= heldNow.up && !heldNav.up;
-            nav.down |= heldNow.down && !heldNav.down;
+            nav.up |= (heldNow.up && !heldNav.up) || repeatDue(heldUpFrames);
+            nav.down |= (heldNow.down && !heldNav.down) || repeatDue(heldDownFrames);
             nav.left |= heldNow.left && !heldNav.left;
             nav.right |= heldNow.right && !heldNav.right;
             nav.accept |= pressed(cfg.byLabel ? PAD_A : PAD_B);

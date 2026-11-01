@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The pause menu: hold up or down** on a controller to move through the rows quickly, as in the
+  game list.
 - **PS5 (test version)**: the all-games program as homebrew for a jailbroken PS5, started from
   ps5-payload-websrv's homebrew list, with the game list, the widescreen view and the Japanese
   menus. For now the picture is drawn by the processor; the games run on the JIT (without fast
