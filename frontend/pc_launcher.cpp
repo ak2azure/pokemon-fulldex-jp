@@ -1526,6 +1526,7 @@ bool Start(int& argc, char**& argv)
     setenv("SSR_PERF", "1", 0);
     // (The compositor shares the picture out between half of these: merged.h.)
     fprintf(stderr, "[ps5] %u hardware threads\n", std::thread::hardware_concurrency());
+    Ps5::SetLibraryPath(argc > 0 ? argv[0] : nullptr);
 #endif
 
     std::map<std::string, std::vector<uint32_t>> artCache;

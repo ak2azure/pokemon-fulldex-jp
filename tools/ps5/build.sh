@@ -21,9 +21,12 @@
 #   pokemon-ds-wide/             copied to /data/pokemon-ds-wide on the PS5 (FTP, ftpsrv): its
 #                                data/funcs holds the function tables, the ROMs go in its roms
 #
-# The PS5's picture is drawn by its processor (SDL's PS5 video driver), and the games run on
-# melonDS's JIT without fast memory, or its interpreter if the kernel does not let the payload
-# run code it makes (frontend/ps5.h, CanRunJit).
+# The game's picture is drawn by the PS5's graphics chip at 3840x2160 (OpenGL ES through Mesa:
+# zink on RADV), with the processor's picture (SDL's software renderer, 1920x1080) when that
+# cannot start; the game list keeps to the processor. Mesa's libraries go beside eboot.elf, and
+# SDL is built here (ps5-payload-dev's SDL with pacbrew's Mesa patch) with its OpenGL ES 2
+# renderer, which pacbrew's SDL leaves out. The games run on melonDS's JIT without fast memory,
+# or its interpreter if the kernel does not let the payload run code it makes (frontend/ps5.h).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -34,6 +37,10 @@ BW2_COMMIT=753b3fd97683fc619bb98b52e7276afac3d5e32f
 W2_COMMIT=be2c125a700c23702ba1c5a4ef63e0e970bcc87a
 BW1_DECOMP=https://github.com/Project-Holon/aletheia.git
 BW1_COMMIT=0d05b6ccc61fcea090d8318a00af9f1634810e18
+SDL_REPO=https://github.com/ps5-payload-dev/SDL.git
+SDL_COMMIT=ee4c47dc0d617b3bc8f35108f9956baf228a1322
+PACBREW_REPO=https://github.com/ps5-payload-dev/pacbrew-repo.git
+PACBREW_COMMIT=722187f0ee246c0d7d57401c8a97de1c7f4e2ff0
 
 say() { printf '\n== %s\n' "$*"; }
 fail() { printf '\nerror: %s\n' "$*" >&2; exit 1; }
@@ -80,6 +87,35 @@ python3 tools/bw1/funcmap.py build-decomp-aletheia/layout/function_addrs.tsv - "
 python3 tools/bw2/funcmap.py build-decomp-pokebw2/config/b2_us/arm9 - "$FUNCS/IREJ.txt" --jp-black2
 cp tools/platinum/CPUE.txt tools/platinum/CPUJ.txt "$FUNCS/"
 
+say "SDL with its OpenGL ES 2 renderer"
+# (pacbrew's SDL2 package, ps5-payload-dev's SDL with its Mesa patch, and one line more: the
+# OpenGL ES 2 renderer, which draws the game with the graphics chip. It replaces the SDK's
+# libSDL2.a; the headers stay.)
+fetch_symbols build-ps5-pacbrew "$PACBREW_REPO" "$PACBREW_COMMIT" '/SDL2/*.patch'
+if [ ! -d build-ps5-sdl/.git ]; then
+    git clone -q "$SDL_REPO" build-ps5-sdl
+fi
+git -C build-ps5-sdl checkout -q --force "$SDL_COMMIT"
+git -C build-ps5-sdl clean -qfdx
+patch -d build-ps5-sdl -Np1 -s -i "$HERE/build-ps5-pacbrew/SDL2/0001-ps5-opengl-opengles-and-vulkan-through-mesa.patch"
+python3 - build-ps5-sdl/CMakeLists.txt <<'EOF'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+a = "      set(SDL_VIDEO_OPENGL_ES2 1)\n      set(HAVE_OPENGLES TRUE)\n    endif()\n    if(SDL_VULKAN)"
+assert s.count(a) == 1, "the PS5's OpenGL ES lines in SDL's CMakeLists.txt have changed"
+s = s.replace(a, a.replace("set(SDL_VIDEO_OPENGL_ES2 1)", "set(SDL_VIDEO_OPENGL_ES2 1)\n      set(SDL_VIDEO_RENDER_OGL_ES2 1)"))
+open(p, "w").write(s)
+EOF
+(
+    source "$PS5_PAYLOAD_SDK/toolchain/prospero.sh"
+    "$CMAKE" -S build-ps5-sdl -B build-ps5-sdl/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DSDL_OPENGL=YES -DSDL_OPENGLES=YES -DSDL_VULKAN=YES -DSDL_LOADSO=YES >/dev/null
+    ninja -C build-ps5-sdl/build SDL2-static >/dev/null
+)
+SDL_LIB="$PS5_PAYLOAD_SDK/target/user/homebrew/lib/libSDL2.a"
+if [ -w "$SDL_LIB" ]; then cp build-ps5-sdl/build/libSDL2.a "$SDL_LIB"; else sudo cp build-ps5-sdl/build/libSDL2.a "$SDL_LIB"; fi
+
 say "Compiling for the PS5"
 # (The toolchain file sets PS5, which makes CMakeLists.txt build the payload: SSR_PS5.)
 source "$PS5_PAYLOAD_SDK/toolchain/prospero.sh"
@@ -91,6 +127,11 @@ HB=build-ps5-dist/homebrew/PokemonFulldex
 mkdir -p "$HB/sce_sys"
 "$STRIP" -o "$HB/eboot.elf" build-ps5/pokemon-fulldex.elf
 cp tools/ps5/homebrew.js "$HB/homebrew.js"
+# Mesa (MIT licence): EGL and OpenGL ES, gallium's zink and RADV, found beside eboot.elf
+# (LD_LIBRARY_PATH, frontend/ps5.h); everything else they use is the console's own.
+MESA="$PS5_PAYLOAD_SDK/target/user/homebrew/lib"
+for lib in libEGL.so.1 libGLESv2.so.2 libvulkan.so.1; do cp -L "$MESA/$lib" "$HB/$lib"; done
+cp -L "$MESA"/libgallium-*.so "$HB/"
 python3 tools/ps5/make_icon.py "$HB/sce_sys/icon0.png"
 cp LICENSE "$OUT/LICENSE.txt"
 cp tools/ps5/README.txt build-ps5-dist/README.txt
@@ -98,7 +139,7 @@ cp tools/ps5/README.txt build-ps5-dist/README.txt
 # Only the payload, the tables, the notes and the empty folders: never a ROM, save or game code.
 (cd build-ps5-dist && find . -mindepth 1 | sed 's|^\./||' | python3 -c "
 import re, sys
-ok = re.compile(r'^(README\.txt|homebrew(/PokemonFulldex(/(eboot\.elf|homebrew\.js|sce_sys|sce_sys/icon0\.png))?)?|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
+ok = re.compile(r'^(README\.txt|homebrew(/PokemonFulldex(/(eboot\.elf|homebrew\.js|sce_sys|sce_sys/icon0\.png|libEGL\.so\.1|libGLESv2\.so\.2|libvulkan\.so\.1|libgallium-[0-9.]+\.so))?)?|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
 bad = [l for l in sys.stdin.read().split() if not ok.match(l)]
 if bad: sys.exit('unexpected files in the download: %s' % bad)
 ")

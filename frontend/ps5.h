@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <sys/mman.h>
 
 extern "C" {
@@ -43,6 +44,31 @@ inline void Notify(const char* fmt, ...)
 inline void CloseAppAtExit()
 {
     atexit([] { sceSystemServiceLoadExec("exit", nullptr); });
+}
+
+// Mesa's libraries (EGL, OpenGL ES, gallium's zink, RADV) are beside eboot.elf, where the
+// SDK's loader finds them through LD_LIBRARY_PATH (it reads it at each dlopen): the program's
+// own folder, from argv[0], and websrv's usual one.
+inline void SetLibraryPath(const char* argv0)
+{
+    std::string dirs;
+    if (argv0 && strchr(argv0, '/'))
+    {
+        dirs = argv0;
+        dirs.erase(dirs.find_last_of('/'));
+        dirs += ":";
+    }
+    dirs += "/data/homebrew/PokemonFulldex";
+    if (const char* old = getenv("LD_LIBRARY_PATH"); old && *old) dirs += std::string(":") + old;
+    setenv("LD_LIBRARY_PATH", dirs.c_str(), 1);
+    fprintf(stderr, "[ps5] started as %s; libraries from %s\n", argv0 ? argv0 : "?", dirs.c_str());
+}
+
+// The game drawn by the graphics chip (SDL's OpenGL ES 2 renderer on Mesa) unless
+// SSR_PS5_SOFTWARE is set.
+inline bool UseGpu()
+{
+    return !getenv("SSR_PS5_SOFTWARE");
 }
 
 // Whether melonDS's JIT can run here: code made at run time needs memory that can be written

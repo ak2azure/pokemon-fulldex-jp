@@ -1993,9 +1993,15 @@ int main(int argc, char** argv)
 #if defined(__APPLE__)
         if (!getenv("SDL_RENDER_DRIVER")) SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
 #elif defined(SSR_PS5)
-        // (The PS5: SDL's picture there is drawn by the processor; see pc_launcher.cpp.)
-        SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
-        if (window && !Ps5::PrepareWindow(window)) return 1;
+        // The PS5: the graphics chip draws the game (OpenGL ES through Mesa, the whole
+        // 3840x2160 screen) unless SSR_PS5_SOFTWARE is set; if it cannot, the processor's
+        // picture below, as the game list has (pc_launcher.cpp).
+        if (Ps5::UseGpu()) SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
+        else
+        {
+            SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+            if (window && !Ps5::PrepareWindow(window)) return 1;
+        }
 #elif !defined(_WIN32)
         if (!getenv("SDL_RENDER_DRIVER")) SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
 #endif
@@ -2035,8 +2041,14 @@ int main(int argc, char** argv)
         if (!renderer)
         {
             fprintf(stderr, "SDL accelerated renderer failed: %s; trying fallback\n", SDL_GetError());
+#ifdef SSR_PS5
+            Ps5::Notify("Pokemon Fulldex: no graphics chip (%s): the processor draws", SDL_GetError());
+            SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
+            if (window && Ps5::PrepareWindow(window)) renderer = SDL_CreateRenderer(window, -1, 0);
+#else
             SDL_SetHint(SDL_HINT_RENDER_DRIVER, "");
             renderer = SDL_CreateRenderer(window, -1, 0);
+#endif
         }
         if (!window || !renderer)
         {
@@ -3830,10 +3842,14 @@ int main(int argc, char** argv)
     GpuCompositor* gpuCompose = nullptr;
     BattleWide battleWide;
 #ifdef SSR_PS5
-    // The PS5: SDL's only renderer there is the software one, which drew the GPU compositor's
-    // scaled pieces on one core (13-34 ms a frame at 1080p). The compositor of the headless
-    // tests shares the picture out between threads instead.
-    const bool cpuCompose = true;
+    // The PS5 with the processor's picture (SDL's software renderer): that renderer drew the
+    // GPU compositor's scaled pieces on one core (13-34 ms a frame at 1080p), so the compositor
+    // of the headless tests shares the picture out between threads instead. With the graphics
+    // chip (OpenGL ES) the GPU compositor, as on a PC.
+    const bool cpuCompose = [&] {
+        SDL_RendererInfo info;
+        return !renderer || SDL_GetRendererInfo(renderer, &info) != 0 || !strcmp(info.name, "software");
+    }();
 #else
     const bool cpuCompose = getenv("SSR_CPU_COMPOSE") != nullptr;
 #endif
