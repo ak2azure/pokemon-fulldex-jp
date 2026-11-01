@@ -1,10 +1,60 @@
 // See glcontext.h.
 #include "glcontext.h"
 #include "frontend/glad/glad.h"
+#ifdef SSR_PS5
+// The PS5: Mesa's EGL is not linked in (the payload's loader would look for it before the
+// program could say where it is: frontend/ps5.h, SetLibraryPath) but loaded when the context is
+// made, and its functions taken from it (LoadEgl below), under the names used here.
+#define EGL_EGL_PROTOTYPES 0
+#define MESA_EGL_NO_X11_HEADERS
+#define EGL_NO_X11
+#endif
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <cstdio>
 #include <cstring>
+#ifdef SSR_PS5
+#include <cstdlib>
+#include <dlfcn.h>
+#include <string>
+#define SSR_EGL_FUNCTIONS(X) \
+    X(eglGetProcAddress, PFNEGLGETPROCADDRESSPROC) X(eglQueryString, PFNEGLQUERYSTRINGPROC) \
+    X(eglGetDisplay, PFNEGLGETDISPLAYPROC) X(eglInitialize, PFNEGLINITIALIZEPROC) \
+    X(eglBindAPI, PFNEGLBINDAPIPROC) X(eglQueryAPI, PFNEGLQUERYAPIPROC) \
+    X(eglChooseConfig, PFNEGLCHOOSECONFIGPROC) X(eglGetConfigs, PFNEGLGETCONFIGSPROC) \
+    X(eglCreateContext, PFNEGLCREATECONTEXTPROC) X(eglDestroyContext, PFNEGLDESTROYCONTEXTPROC) \
+    X(eglMakeCurrent, PFNEGLMAKECURRENTPROC) X(eglCreatePbufferSurface, PFNEGLCREATEPBUFFERSURFACEPROC) \
+    X(eglGetError, PFNEGLGETERRORPROC) X(eglGetCurrentDisplay, PFNEGLGETCURRENTDISPLAYPROC) \
+    X(eglGetCurrentSurface, PFNEGLGETCURRENTSURFACEPROC) X(eglGetCurrentContext, PFNEGLGETCURRENTCONTEXTPROC)
+#define SSR_EGL_DECLARE(name, type) static type name = nullptr;
+SSR_EGL_FUNCTIONS(SSR_EGL_DECLARE)
+
+// libEGL.so.1 opened RTLD_GLOBAL, as SDL's PS5 video driver opens it, so that SDL's later
+// dlopen of it gets this same copy (the SDK's loader shares a library only then; two copies
+// would each have their own Mesa). EGL_PLATFORM: the screen's platform, as SDL sets it.
+// libGL.so.1 too, for desktop OpenGL's functions.
+static bool LoadEgl(std::string& info)
+{
+    if (eglGetProcAddress) return true;
+    setenv("EGL_PLATFORM", "videoout", 0);
+    void* egl = dlopen("libEGL.so.1", RTLD_NOW | RTLD_GLOBAL);
+    if (!egl)
+    {
+        const char* err = dlerror();
+        info = std::string("libEGL.so.1 not loaded: ") + (err ? err : "?");
+        return false;
+    }
+    dlopen("libGL.so.1", RTLD_NOW | RTLD_GLOBAL);
+#define SSR_EGL_LOAD(name, type) \
+    if (!(name = reinterpret_cast<type>(dlsym(egl, #name)))) \
+    { \
+        info = "libEGL.so.1 has no " #name; \
+        return false; \
+    }
+    SSR_EGL_FUNCTIONS(SSR_EGL_LOAD)
+    return true;
+}
+#endif
 #ifdef __APPLE__
 #include <SDL.h>
 #else
@@ -28,6 +78,9 @@ static SDL_GLContext SdlContext = nullptr;
 
 void* SsrGLGetProc(const char* name)
 {
+#ifdef SSR_PS5
+    if (!eglGetProcAddress) return nullptr;
+#endif
     return (void*)eglGetProcAddress(name);
 }
 
@@ -87,6 +140,9 @@ static std::string EglError(const char* what)
 
 bool SsrCreateGLContext(std::string& info)
 {
+#ifdef SSR_PS5
+    if (!LoadEgl(info)) return false;
+#endif
     // A display without a window: Mesa's surfaceless platform where there is one (a PC
     // without a desktop, as in the headless tests), otherwise the default display.
     EGLDisplay display = EGL_NO_DISPLAY;

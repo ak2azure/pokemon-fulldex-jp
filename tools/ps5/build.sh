@@ -23,8 +23,9 @@
 #
 # The game's picture is drawn by the PS5's graphics chip at 3840x2160 (OpenGL ES through Mesa:
 # zink on RADV), with the processor's picture (SDL's software renderer, 1920x1080) when that
-# cannot start; the game list keeps to the processor. Mesa's libraries go beside eboot.elf, and
-# SDL is built here (ps5-payload-dev's SDL with pacbrew's Mesa patch) with its OpenGL ES 2
+# cannot start; the game list keeps to the processor. The widescreen world is drawn by the
+# graphics chip too (WORLD ON GPU: desktop OpenGL 4.3 on zink, frontend/glcontext.cpp).
+# Mesa's libraries go beside eboot.elf, and SDL is built here (ps5-payload-dev's SDL with pacbrew's Mesa patch) with its OpenGL ES 2
 # renderer, which pacbrew's SDL leaves out. The games run on melonDS's JIT without fast memory,
 # or its interpreter if the kernel does not let the payload run code it makes (frontend/ps5.h).
 set -euo pipefail
@@ -120,7 +121,7 @@ say "Compiling for the PS5"
 # (The toolchain file sets PS5, which makes CMakeLists.txt build the payload: SSR_PS5.)
 source "$PS5_PAYLOAD_SDK/toolchain/prospero.sh"
 "$CMAKE" -S . -B build-ps5 -G Ninja -DCMAKE_BUILD_TYPE=Release -DSSR_JIT=ON -DSSR_PC_ALL_GAMES=ON \
-    -DSSR_PNG=OFF -DSSR_GPU3D=OFF -DSSR_PORTABLE_X86=ON -DSSR_GENERATED_DIR="$HERE/build-gen-tables" \
+    -DSSR_PNG=OFF -DSSR_GPU3D=ON -DSSR_PORTABLE_X86=ON -DSSR_GENERATED_DIR="$HERE/build-gen-tables" \
     -DCMAKE_VERBOSE_MAKEFILE=OFF >/dev/null
 ninja -C build-ps5 ssrecomp
 HB=build-ps5-dist/homebrew/PokemonFulldex
@@ -130,7 +131,7 @@ cp tools/ps5/homebrew.js "$HB/homebrew.js"
 # Mesa (MIT licence): EGL and OpenGL ES, gallium's zink and RADV, found beside eboot.elf
 # (LD_LIBRARY_PATH, frontend/ps5.h); everything else they use is the console's own.
 MESA="$PS5_PAYLOAD_SDK/target/user/homebrew/lib"
-for lib in libEGL.so.1 libGLESv2.so.2 libvulkan.so.1; do cp -L "$MESA/$lib" "$HB/$lib"; done
+for lib in libEGL.so.1 libGLESv2.so.2 libGL.so.1 libvulkan.so.1; do cp -L "$MESA/$lib" "$HB/$lib"; done
 cp -L "$MESA"/libgallium-*.so "$HB/"
 python3 tools/ps5/make_icon.py "$HB/sce_sys/icon0.png"
 cp LICENSE "$OUT/LICENSE.txt"
@@ -139,7 +140,7 @@ cp tools/ps5/README.txt build-ps5-dist/README.txt
 # Only the payload, the tables, the notes and the empty folders: never a ROM, save or game code.
 (cd build-ps5-dist && find . -mindepth 1 | sed 's|^\./||' | python3 -c "
 import re, sys
-ok = re.compile(r'^(README\.txt|homebrew(/PokemonFulldex(/(eboot\.elf|homebrew\.js|sce_sys|sce_sys/icon0\.png|libEGL\.so\.1|libGLESv2\.so\.2|libvulkan\.so\.1|libgallium-[0-9.]+\.so))?)?|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
+ok = re.compile(r'^(README\.txt|homebrew(/PokemonFulldex(/(eboot\.elf|homebrew\.js|sce_sys|sce_sys/icon0\.png|libEGL\.so\.1|libGLESv2\.so\.2|libGL\.so\.1|libvulkan\.so\.1|libgallium-[0-9.]+\.so))?)?|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
 bad = [l for l in sys.stdin.read().split() if not ok.match(l)]
 if bad: sys.exit('unexpected files in the download: %s' % bad)
 ")

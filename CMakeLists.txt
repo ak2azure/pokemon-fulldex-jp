@@ -298,7 +298,10 @@ else()
         target_link_libraries(ssrecomp PRIVATE opengl32 gdi32)
     elseif(SSR_GPU3D)
         target_include_directories(ssrecomp PRIVATE "${SSR_EGL_INCLUDE}")
-        target_link_libraries(ssrecomp PRIVATE "${SSR_EGL_LIBRARY}")
+        # (Not on the PS5: there Mesa's EGL is loaded as the context is made, frontend/glcontext.cpp.)
+        if(NOT PS5)
+            target_link_libraries(ssrecomp PRIVATE "${SSR_EGL_LIBRARY}")
+        endif()
     endif()
     # The PC all-games program (tools/pc/build_all.sh): the game list when started without
     # arguments (frontend/pc_launcher.cpp), with the ROMs in the roms folder beside it.
