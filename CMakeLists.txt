@@ -39,13 +39,6 @@ option(SSR_JIT "Build melonDS's JIT in (for --jit)" OFF)
 set(ENABLE_JIT ${SSR_JIT} CACHE BOOL "" FORCE)
 set(ENABLE_GDBSTUB OFF CACHE BOOL "" FORCE)
 set(ENABLE_LTO_RELEASE OFF CACHE BOOL "" FORCE)
-if(PS5)
-    # The PS5's processor is a Zen 2 (AVX2, FMA, BMI): code for it rather than for the first
-    # x86-64 machines, which ps5-payload-sdk's toolchain leaves it at. The emulation (without
-    # a JIT there) and the widescreen 3D's AVX2 loop both gain; set before melonDS so it is
-    # built so too.
-    add_compile_options(-march=znver2)
-endif()
 add_subdirectory(melonDS EXCLUDE_FROM_ALL)
 
 # PS5 homebrew (a payload for elfldr): built with ps5-payload-sdk's toolchain file
