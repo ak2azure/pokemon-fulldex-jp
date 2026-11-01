@@ -426,6 +426,9 @@ int PickGame(Folders& fo, std::vector<Launcher::Game>& games, int selected, bool
     if (!renderer)
     {
         fprintf(stderr, "[launcher] no window: %s\n", SDL_GetError());
+#ifdef SSR_PS5
+        Ps5::Notify("Pokemon Fulldex: no window: %s", SDL_GetError());
+#endif
         if (window) SDL_DestroyWindow(window);
         SDL_Quit();
         return -1;

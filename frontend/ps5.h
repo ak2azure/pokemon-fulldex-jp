@@ -45,12 +45,18 @@ inline void CloseAppAtExit()
 
 // Before the software renderer: the window's picture, which opens the PS5's video output.
 // SDL replaces the reason it fails with "Couldn't find matching render driver", so it is
-// asked for here first and the real reason shown. No texture framebuffer: SDL's PS5 build has
-// only the software renderer, and trying for one only hides that error too.
+// asked for here first and the real reason shown, then let go again: SDL makes no renderer
+// for a window that has a picture already ("Surface already associated with window"); the
+// video output stays open. No texture framebuffer: SDL's PS5 build has only the software
+// renderer, and trying for one only hides that error too.
 inline bool PrepareWindow(SDL_Window* window)
 {
     SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
-    if (SDL_GetWindowSurface(window)) return true;
+    if (SDL_GetWindowSurface(window))
+    {
+        SDL_DestroyWindowSurface(window);
+        return true;
+    }
     Notify("Pokemon Fulldex: no picture (%s). Start it from websrv's homebrew list.", SDL_GetError());
     return false;
 }

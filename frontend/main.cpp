@@ -2041,6 +2041,9 @@ int main(int argc, char** argv)
         if (!window || !renderer)
         {
             fprintf(stderr, "cannot create window: %s\n", SDL_GetError());
+#ifdef SSR_PS5
+            Ps5::Notify("Pokemon Fulldex: cannot create window: %s", SDL_GetError());
+#endif
             return 1;
         }
         {
