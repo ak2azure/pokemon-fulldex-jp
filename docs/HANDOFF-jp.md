@@ -1,0 +1,105 @@
+# Pokémon Fulldex 日本語ROM対応：引き継ぎメモ
+
+対象リポジトリ: `ak2azure/pokemon-fulldex-jp`（`mamesj/pokemon-fulldex` のフォーク）
+目標: 本家が対応している全ゲームを日本語版ROMでも遊べるようにする（Switch版。Android版は作らない）
+
+> このファイルは新しいセッションへの引き継ぎ用。`CLAUDE.md` から読み込まれる。作業が進んだらここを更新してコミットすること。
+
+## 作業のしかた（2026-11-02 時点）
+
+- **Cowork セッション（ユーザーPCとリンク）では git push できない。** リポジトリがセッションの許可リストに無いため、push も GitHub API も 403。Cowork にはリポジトリを選ぶ画面が無い。
+  - 代わりに、ユーザーPCのクローン `C:\Users\user\Documents\GitHub\pokemon-fulldex-jp`（GitHub Desktop）にフォルダアクセスをもらい、`device_commit_files` で書き込む → GitHub Desktop で Commit/Push（computer use で操作するか、ユーザーに依頼）。
+  - もう一つの方法: アプリ内ブラウザ（GitHubにサインイン済み）の upload ページで、JS から `#upload-manifest-files-input` に File を入れてコミット。Actions の手動実行もブラウザから。
+  - 読むだけなら公開リポジトリなので `git clone https://github.com/ak2azure/pokemon-fulldex-jp.git` でできる。
+- **Claude Code（クラウド）でリポジトリを選んで始めれば直接 push できる。** ただしユーザーPCの ROM には届かない見込みなので、ROM が必要な作業は Cowork 側で。
+- 作業環境（ROMの取り込み、SS の gen/、逆コンパイルのシンボル、PS5 SDK）はセッションをまたいで残らない。必要なら再取得: ROM はユーザーPCから device_stage_files（大きいものはZIPで）。gen/ は北米版SS ROMから `tools/recomp.py`、PS5 SDK は pacbrew-repo のリリース `ps5-payload-dev.tar.gz`。
+- Switch用ファイルは GitHub Actions で作る（作業環境では devkitPro がダウンロードできない）。
+
+## ここまでの状況
+
+- **日本語版ブラック（IRBJ）: 完了。** Switch実機で動作確認済み（fpsが少し落ちる場面あり。英語版と共通の可能性が高い）。
+- **日本語版ホワイト（IRAJ）: Switch実機の確認待ち（2026-10-31）。**
+  - main に反映済み（コミット 828f585, 9c1352b, 569b862）。Actions「Switch Black and White」#2 成功（成果物 pokemon-bw-switch）。
+  - セーブは `white-jp.sav`。
+- ワークフロー `.github/workflows/switch-bw.yml`（「Switch Black and White」）: 手動実行、4分弱、成果物 `pokemon-bw-switch`。
+  - 中の `pokemon-black-white-wide-switch.zip` を展開して `switch` フォルダをSDカードのルートへ。ROMは `/switch/pokemon-black-wide/`。
+
+## 全ゲーム版（1つのnro）
+
+- 本家の `tools/switch/build_game.sh all`（起動時のゲーム一覧＋設定画面、pokemon-ds-wide.nro）を、SoulSilver(US) ROMなしでも作れるようにした（ROM省略時は tools/bw2/stubgen を使い、SS/HGは一覧に出ない）。`tools/switch/build.sh` はJITビルドなら gen/ を要求しないよう修正。
+- ワークフロー `.github/workflows/switch-all.yml`（「Switch all games」）。成果物 `pokemon-ds-wide-all-switch`（中に pokemon-ds-wide-all-switch.zip）。
+- SDカード: `switch/pokemon-ds-wide/pokemon-ds-wide.nro`、ROMは `switch/pokemon-ds-wide/roms/`（名前自由）。
+
+## UIの日本語化（2026-10-31）
+
+- `frontend/i18n.h`（Tr: 描画直前に英語→日本語、合成文字列のルール）、`frontend/i18n_ja.h`（訳語表）、`frontend/jpfont.h`（12ドット、`tools/i18n/make_font.py` で efont b12.bdf から生成。BDFは u8g2 リポジトリの tools/font/bdf/b12.bdf を git sparse-checkout で取得）。
+- `ui.h` の Canvas::Text/TextWidth が UTF-8 対応＋Tr。日本語は JpScale=round(7*scale/12) 倍。設定ページは日本語時 ts=s（720pで3）。説明文は WrapPx で翻訳後に折り返し、Text(..., false) で再翻訳しない。
+- 設定「GAME LIST > LANGUAGE」（list_language: ja 既定 / en）。main.cpp の設定保存にも追加。
+- Actions「Switch all games」#3 成功、実機確認待ち。訳語を足すときは i18n_ja.h に追加し make_font.py を再実行（jpfont.h 再生成）。
+
+## 日本語版プラチナ（CPUJ）（2026-10-31）
+
+- `tools/match_table.py`（英語版の関数表＋英語版ROM＋日本語版ROM → 日本語版の関数表。サイズは次の関数まで）で `tools/platinum/CPUJ.txt` を作成。34,659中33,420一致、監視関数はすべて一致。
+- launcher.h（CPUJ、platinum-jp.sav）、platinum.h（CPUJも on）、build_game.sh（romfsにCPUJ.txt）。Actions「Switch all games」#4 成功、実機確認待ち。
+
+## 日本語版ブラック2（IREJ）
+
+- 完了（実機確認待ち）。match_table.py で照合（42,691中41,190、監視関数は全部、うち4つは類似度）→ `tools/bw2/jp_black2_shifts.txt`（ずれ表）＋ `tools/bw2/funcmap.py --jp-black2`。
+- bw2map.h IREJ: 0x021c9768, 0x0208eb48, 0x1a3800, 29。exclusives/launcher/i18n対応。Actions #5 成功（ログでIREJ表の生成を確認）。
+- ホワイト2日本語版はROMなし。
+
+## ソウルシルバー/ハートゴールド日本語版（IPGJ/IPKJ）
+
+- 全ゲーム版はJIT＋表のみ（tables_only）で動くので、HeartGold US と同じ仕組み（tools/soulsilver/*.json の shifts、runtime の Remap）で対応。基準は北米版SS(IPGE)。
+- `tools/soulsilver/match_japanese.py`（チャンク＋layoutのnamed関数単位で照合、類似度0.8で補完）→ soulsilver-jp.json / heartgold-jp.json（各約636区間）。約38,300中708未発見（ボルトロスのスロット等、日本版にない物）。監視する関数（apps/focus/hook）はボルトロス以外すべて一致。
+- 北米版SSの表 `tools/soulsilver/tables/`（rc_tables.cpp, apps_table.cpp：アドレスのみ）をリポジトリに置き、build_game.sh all（ROMなし）が tables_only.py でそこから作る → 北米版SS/HGも全ゲーム版で遊べる。
+- フロント（main.cpp soulSilverRom、Playable、heartSilver、launcher、pc_launcher、i18n）対応済み。Actions「Switch all games」#6 成功、ログで4本（SS/HG 北米・日本）の表を確認。
+- 不具合修正（11/1）: 実機で日本語版HGの通常マップがワイドにならなかった。原因は日本語版のオーバーレイの読み込み先アドレスが北米版と違う（field: -0xAC0 など）のに、ずれを「オーバーレイ内のずれ」としか扱っていなかったこと。json の各セクション先頭に [0,0,move] を追加し、runtime/recomp_rt.cpp の Remap と rc_portable_load（セクションbase）で move を足すようにした。FieldMap_Main が正しい位置になることを確認。#8 成功、実機確認待ち。
+
+## PS5 版（2026-11-02、テスト版・実機未確認）
+
+- jailbreak した PS5 の elfldr（ポート9021）に送る ELF ペイロード。PC 全ゲーム版（`pc_launcher.cpp`、SSR_PC_ALL_GAMES）をそのまま使い、ゲームリスト・ワイド表示・日本語メニューも入る。
+- ツールチェーン: ps5-payload-sdk ＋ pacbrew-repo のリリース `ps5-payload-dev.tar.gz`（SDL2 などのライブラリ込み、/ に展開すると /opt/ps5-payload-sdk）。clang-18 / lld-18。
+- ビルド: `tools/ps5/build.sh`（ROM不要。SS/HG の表は tools/soulsilver/tables、BW 系は逆コンパイルのシンボルから）。ワークフロー `.github/workflows/ps5.yml`（成果物 `pokemon-fulldex-ps5`: pokemon-fulldex.elf、README.txt、pokemon-ds-wide/）。
+- 実行時: フォルダーは `/data/pokemon-ds-wide`（data/funcs、roms、saves、settings.cfg、game.log）。SDL の PS5 ドライバー（VideoOut のフレームバッファ、scePad、AudioOut）。描画は SDL の software レンダラー、JIT なし（インタプリタ）、GPU3D なし。
+- コード: CMake の `PS5`（toolchain が設定）→ `SSR_PS5` 定義、出力名 pokemon-fulldex.elf。ffsystem.c の localtime_r 対策に `-include time.h`。pc_launcher.cpp: PS5 のフォルダー、--jit を渡さない、Finish は何もしない（再起動できないので終了）。main.cpp: software レンダラー、常にフルスクリーン。
+- 未確認・今後: 実機での起動、速度（インタプリタで重い可能性）、終了後リストへ戻る方法、JIT（sceKernelJitCreateSharedMemory 等）。
+
+## ROMの場所（ユーザーPC）
+
+- `C:\Users\user\Documents\roms`（すべて日本語版）: ブラック、ホワイト、ブラック2、プラチナ、ソウルシルバー、ハートゴールド。ホワイト2(日本語)は無い。
+- `C:\Users\user\Documents\海外roms`（英語版）: ブラック US、ブラック2 US/EU、プラチナ US、ソウルシルバー EU。
+- 取り込みはフォルダアクセスをもらって device_stage_files（1ファイル400MBまで。超えるものはZIP化を依頼）。
+
+## 変更した主なファイル（BW1）
+
+| ファイル | 内容 |
+|---|---|
+| `tools/bw1/match_jp.py` | 英語版ブラックと日本語版ROMを照合して、関数のずれの表（shifts）を作る。マップ拡張用アドレスも探す。`--via-jp-black <black-jp.nds> <white-jp.nds>` で英語版ROMの代わりに日本語版ブラック（jp_black_shifts.txt経由）を基準にできる |
+| `tools/bw1/jp_black_shifts.txt` | 日本語版ブラックのずれの表 |
+| `tools/bw1/jp_white_shifts.txt` | 日本語版ホワイトのずれの表（--via-jp-black で作成） |
+| `tools/bw1/funcmap.py` | `--jp-black` / `--jp-white` オプション |
+| `tools/bw2/funcmap.py` | 展開できないオーバーレイを空として扱う（日本語版ブラックのオーバーレイ12が壊れていて未使用） |
+| `frontend/bw1.h`, `exclusives.h`, `launcher.h`, `pc_launcher.cpp`, `switch_platform.cpp` | IRBJ / IRAJ を英語版と同様に扱う。セーブ `black-jp.sav` / `white-jp.sav` |
+| `frontend/bw2map.h` | IRBJ: `0x021d3530`, `0x0209d7bc`, `0x199000`, 21 / IRAJ: `0x021d3548`, `0x0209d7d4`, `0x199000`, 21 |
+| `tools/switch/build_game.sh` | shifts ファイルがあれば IRBJ / IRAJ の表を romfs に入れる |
+| `CHANGELOG.md` | Unreleased に日本語版の行 |
+
+## 照合の方法と分かったこと
+
+- 英語版と同じ関数を、直前の関数のずれを起点に、アドレス等をマスクした命令列で探す（窓を広げながら）。日本語版ブラックは 35,255 関数中 33,065 個が一致。
+- 画面レイアウトが使う関数45個はすべて特定済み。うち4個は日本語版で構造体のオフセットが違うため類似度で特定:
+  `GFLAppInit` +0x0、`ConfigPanel_Main` ov068 -0x160、`BChoiceMain_Task` ov093 -0x1cc、`NameEntry_ProcMain` ov194 -0x138
+- PC版（Linux）で英語版と同じ入力を流して比較し、場面の切り替わりが一致することを確認（ブラック）。
+- ホワイト: `--via-jp-black` の自己テスト（日本語版ブラック同士）で jp_black_shifts.txt と全関数一致を確認。ホワイトは 34,674 関数一致、45個の監視関数すべてがマスク後の命令列で日本語版ブラックと同一。bw2map の値はブラック+0x18（英語版の Black→White と同じ関係）、ユーザーヒープ 0x199000。PC版での比較は未実施。
+
+## 次にやること
+
+- Switch実機確認待ち: ホワイト（IRAJ）、全ゲーム版（UI日本語化、プラチナ CPUJ、ブラック2 IREJ、SS/HG 日本語版＋HGマップ修正 #8）。結果を聞いて直す。
+- PS5 版の実機確認（起動、速度、終了後の戻り方、JIT）。
+- ホワイト2（IRDJ）: 日本語版ROMが手に入れば IREJ と同じ方法で。
+
+## 注意
+
+- ROMはリポジトリに入れない（公開リポジトリ）。
+- aletheia の function_addrs.tsv は raw.githubusercontent.com が使えないので git の sparse-checkout で取る（commit 0d05b6cc…）。
