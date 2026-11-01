@@ -1516,6 +1516,13 @@ bool Start(int& argc, char**& argv)
 #ifdef SSR_PS5
     Ps5::CloseAppAtExit();
     Ps5::Notify("Pokemon Fulldex: starting (%s)", fo.dir.c_str());
+    // Each frame shown while the next is emulated, as on the Switch: SDL's PS5 picture waits
+    // for the screen's flip, which otherwise came after the emulation and drawing, so a frame
+    // a little over 16.7 ms waited for the next flip (30 frames a second, the game at half
+    // speed). The timing lines in game.log too, while this version is tried.
+    setenv("SSR_PIPELINE", "1", 0);
+    setenv("SSR_PERF", "1", 0);
+    setenv("SSR_EMU_PROF", "1", 0);
 #endif
 
     std::map<std::string, std::vector<uint32_t>> artCache;
