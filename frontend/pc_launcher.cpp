@@ -1519,10 +1519,11 @@ bool Start(int& argc, char**& argv)
     // Each frame shown while the next is emulated, as on the Switch: SDL's PS5 picture waits
     // for the screen's flip, which otherwise came after the emulation and drawing, so a frame
     // a little over 16.7 ms waited for the next flip (30 frames a second, the game at half
-    // speed). The timing lines in game.log too, while this version is tried.
+    // speed). The timing lines in game.log too, while this version is tried; not the
+    // emulation's own parts (SSR_EMU_PROF), which read the clock twice each time the geometry
+    // engine runs, tens of thousands of times a frame.
     setenv("SSR_PIPELINE", "1", 0);
     setenv("SSR_PERF", "1", 0);
-    setenv("SSR_EMU_PROF", "1", 0);
     // (The compositor shares the picture out between half of these: merged.h.)
     fprintf(stderr, "[ps5] %u hardware threads\n", std::thread::hardware_concurrency());
 #endif
