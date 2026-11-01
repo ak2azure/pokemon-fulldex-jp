@@ -2468,7 +2468,23 @@ int main(int argc, char** argv)
             // are repeated on both sides of it to fill the width. A dark rectangle under it
             // carries its outline.
             struct Cut { int sx, sy, sw, sh, lx0, lx1, tileX, tileW; };
-            auto button = [&](const Cut& c, float dx, float dy, float dw, uint8_t drop) {
+            auto button = [&](const Cut& cut, float dx, float dy, float dw, uint8_t drop) {
+                // The label as wide as the screen has it: the Japanese games' labels (BAG and
+                // RUN in kana, "PP 29/35") are wider than the English ones the cuts were measured
+                // on, and their ends were drawn at the button's two ends. Columns between the
+                // plain ones and their mirror at the right that are not all the plain colour
+                // widen it.
+                Cut c = cut;
+                auto plainColumn = [&](int x) {
+                    for (int y = c.sy; y < c.sy + c.sh; y++)
+                        if (b[y * 256 + x] != b[y * 256 + c.tileX]) return false;
+                    return true;
+                };
+                const int plainL = c.tileX + c.tileW, plainR = c.sx + c.sw - (c.tileX - c.sx) - c.tileW;
+                for (int x = plainL; x < c.lx0; x++)
+                    if (!plainColumn(x)) { c.lx0 = x; break; }
+                for (int x = plainR - 1; x >= c.lx1; x--)
+                    if (!plainColumn(x)) { c.lx1 = x + 1; break; }
                 const float scl = rowH / c.sh;
                 // (Sized exactly, not to whole base pixels, so that the edges of buttons
                 // above one another line up.)
@@ -6000,9 +6016,12 @@ int main(int argc, char** argv)
             const bool cmd = merged && !strcmp(scene.name, "battle-cmd"), moves = merged && !strcmp(scene.name, "battle-moves");
             if (!paused && (cmd || moves))
             {
+                static int stripKindFrames = 0;
+                stripKindFrames++;
                 if (stripKind != scene.name)
                 {
                     stripKind = scene.name;
+                    stripKindFrames = 0;
                     battleSel = 0;
                     prevStripKeys = keys; // a key still held from before does not count
                 }
@@ -6017,8 +6036,34 @@ int main(int argc, char** argv)
                     uint32_t c = screenImagesPrev[(movY[i] - 14) * 256 + movX[i]];
                     // (Platinum's moves are on a pale yellow panel.)
                     if (pt.on) return ((c >> 16) & 0xFF) > 200 && ((c >> 8) & 0xFF) > 200 && (c & 0xFF) > 140;
-                    return ((c >> 16) & 0xFF) > 200 && ((c >> 8) & 0xFF) > 200 && (c & 0xFF) > 200;
+                    // SoulSilver and HeartGold: a few points across the name's band, not one, as
+                    // the Japanese games' third and fourth moves were taken for empty slots and
+                    // the arrows did not reach them.
+                    int white = 0;
+                    for (int dy : { -18, -14, -10 })
+                        for (int dx : { -40, -20, 0, 20, 40 })
+                        {
+                            const uint32_t p = screenImagesPrev[(movY[i] + dy) * 256 + movX[i] + dx];
+                            white += ((p >> 16) & 0xFF) > 200 && ((p >> 8) & 0xFF) > 200 && (p & 0xFF) > 200;
+                        }
+                    return white >= 3;
                 };
+#ifdef SSR_PS5
+                // (The PS5 test version: the touch screen half a second into each panel's first
+                // showing, and which move slots count as used, to measure the Japanese games'
+                // panels by.)
+                if (stripKindFrames == 30)
+                {
+                    static std::set<std::string> dumped;
+                    if (dumped.insert(scene.name).second)
+                    {
+                        const std::string path = opt.save.substr(0, opt.save.find_last_of('/') + 1) + scene.name + ".bmp";
+                        Ps5::WriteBmp(path, screenImagesPrev, 256, 192);
+                        if (moves)
+                            fprintf(stderr, "[strip] %s: move slots used %d %d %d %d (%s)\n", scene.name, usable(0), usable(1), usable(2), usable(3), path.c_str());
+                    }
+                }
+#endif
                 if (singleView())
                 {
                     // (The single-screen build's strip: one row.)
