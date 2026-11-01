@@ -72,7 +72,8 @@
   - **ゲーム一覧の表示まで実機で確認（11/2）。** 起動後、ランチャーのダイアログを○で閉じると見える。
   - 速度（ブラック、1080p）: 最初は30fps・ゲーム速度半分。PS5 の SDL の表示はフリップを待つので、パイプライン（SSR_PIPELINE）をオンにした。合成は GPU合成（software renderer で 1080p を1コア処理、13〜34ms）をやめて CPU合成（merged.h、複数スレッド、画面サイズのまま）にし、2〜3.5ms になった。残りはエミュレーション（インタプリタ）16.4〜17ms。
   - `-march=znver2` は効果なし（clang の PS5 ターゲットは最初から znver2）。SSR_EMU_PROF は GPU3D::Run ごとに時刻を読むので切った。効果は未確認。
-- 未確認・今後: 速度（エミュレーションがぎりぎり）（インタプリタで重い可能性）、終了後リストへ戻る方法、JIT（sceKernelJitCreateSharedMemory 等）。
+  - JIT（11/2、実機未確認）: PS5 SDK の libc は mmap/mprotect の PROT_EXEC を kernel_mprotect で通す（sdk/libc/mman.c）。SDK の起動処理は jitshm の権限も付ける。melonDS の x64 JIT は実行用のメモリさえあれば動くので、SSR_JIT=ON にした。fastmem（shm_open、8GB の予約、SIGSEGV）は使わない。`ARMJIT_Memory.cpp` の `__PROSPERO__` で DS のメモリを普通のバッファにした（fastmem なしでは Mappings が空のままなので、map/unmap/protect は呼ばれない）。起動時に `Ps5::CanRunJit()`（RWX のページで ret を実行）が通れば --jit。SSR_PS5_INTERP=1 でインタプリタ。
+- 未確認・今後: JIT が実機で動くか、速度（インタプリタで重い可能性）、終了後リストへ戻る方法、JIT（sceKernelJitCreateSharedMemory 等）。
 
 ## ROMの場所（ユーザーPC）
 
