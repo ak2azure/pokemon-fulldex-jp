@@ -76,6 +76,7 @@
   - **JIT は実機（FW 11.0）で動いた（11/2）。** ブラックでエミュレーションは 16.5ms から約6ms になり、ワイド表示の3Dは 1080 本に戻った。早送りも動く。まだ 17.5ms を超えるフレームがときどきある（worst 27〜43ms、present に揺れがある）。
   - GPU（4K）（11/2）: tools/ps5/build.sh で SDL を自分でビルドする（ps5-payload-dev/SDL＋pacbrew のパッチ＋SDL_VIDEO_RENDER_OGL_ES2）。Mesa（libEGL.so.1、libGLESv2.so.2、libgallium-26.2.0.so、libvulkan.so.1）を eboot.elf と同じフォルダーに入れる。**SDK のローダーは LD_LIBRARY_PATH を「:」で区切れない**ので、フォルダーは1つだけ渡す。実機で `OpenGL ES 3.2 Mesa 26.2.0, zink Vulkan 1.4 (PlayStation 5 GPU (RADV NAVI21))`、3840x2160、SDL renderer opengles2 を確認。合成は 0.1〜0.6ms。Mesa の出力は常に 3840x2160 で、モニターの解像度に関係ない。
   - ただし、ワイド表示の3Dは CPU が描くので、WIDESCREEN RES が 2160 だと間に合わない（wide 待ち 17ms）。PS5 では LOWER RES WHEN BUSY を既定でオンにした。3D も GPU で描く（WORLD ON GPU、GL 4.3 が必要。zink は GL 4.6）のが次の段階。
+  - WORLD ON GPU（11/2、実機未確認）: PS5 も SSR_GPU3D=ON。GPU3D_WideGpu_GL.cpp が専用スレッドで desktop GL 4.3 core のコンテキストを作る。PS5 では glcontext.cpp が libEGL.so.1 を RTLD_GLOBAL で dlopen して（SDL より先。後から SDL が読み込むときも同じものを共有する）関数を dlsym で取る。EGL はリンクしない（起動時のローダーは LD_LIBRARY_PATH を知らないため）。libGL.so.1 も配布物に入れた。失敗して落ちたら、次回の起動で自動的にオフになる（WideGpuMarker）。
 - 未確認・今後: ほかの作品（ホワイト、ブラック2、プラチナ、SS/HG）の PS5 での動作、ときどき落ちるフレーム、終了後に黒い画面が残らないか（インタプリタで重い可能性）、終了後リストへ戻る方法、JIT（sceKernelJitCreateSharedMemory 等）。
 
 ## ROMの場所（ユーザーPC）
