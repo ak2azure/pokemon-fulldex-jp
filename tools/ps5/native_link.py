@@ -85,7 +85,10 @@ def main():
     builtins = cfg.get("builtins")
     link = [os.path.join(sdk, "bin", "prospero-lld"),
             "-L", native, "-T", os.path.join(os.path.dirname(os.path.abspath(__file__)), "native", "ps5-pie-unwind.ld"),
-            "--eh-frame-hdr", "--error-limit=0", "-z", "nodynamic-undefined-weak",
+            "--eh-frame-hdr", "--error-limit=0",
+            # (A weak reference nothing defines stays 0 instead of becoming an import, which the
+            # converter could not place: RADV's entry points, thread_local hooks.)
+            "--no-dynamic-linker",
             # (out.map: which function each address is in, for the crash reports in game.log.)
             "--Map=" + out + ".map",
             "--version-script", os.path.join(native, "app-symbols.map"), "--exclude-libs=ALL",
@@ -93,12 +96,28 @@ def main():
     # Archives may need each other in any order (melonDS's core and the frontend's), so they go
     # in one group, with the platform layer and the C++ runtime.
     link += [x for x in inputs if not x.endswith(".a")]
+    # RADV (cfg "whole": its archive, tools/ps5/build_radv.sh), linked whole: Mesa's dispatch
+    # tables name every command through weak references, which pull no archive member in, so a
+    # command no other code needs would be missing (PS5_Vulkan's tools/radv-link.sh).
+    if cfg.get("whole"):
+        link += ["--whole-archive"] + cfg["whole"] + ["--no-whole-archive"]
     link += ["--start-group"] + [x for x in inputs if x.endswith(".a")] + [cfg["platform"]]
     link += [os.path.join(lib, "libc++.a"), os.path.join(lib, "libc++abi.a"), os.path.join(lib, "libunwind.a")]
     if builtins:
         link.append(builtins)
     link += ["--end-group"]
     link += ["--wrap=" + w for w in cfg["wraps_names"]]
+    # Names bound straight to the platform layer's ps5_ functions (cfg "defsyms", for RADV's own
+    # use of libc: tools/ps5/build_native.sh lists them, after radv-link.sh), each kept local
+    # (a title may export nothing).
+    defsyms = cfg.get("defsyms", [])
+    if defsyms:
+        link += ["--defsym=%s=ps5_%s" % (n, n) for n in defsyms]
+        vmap = out + ".local.map"
+        with open(vmap, "w") as f:
+            f.write("{\n    local:\n" + "".join("        %s;\n" % n for n in defsyms) + "};\n")
+        link += ["--version-script", vmap]
+    link += cfg.get("flags", [])
     # The console's modules (their stubs), then what the SDK's libc.a adds that none of them
     # has (emulated thread-local storage, among others): a symbol a module exports is taken
     # from the module, since a shared definition seen first is never replaced by an archive's.
