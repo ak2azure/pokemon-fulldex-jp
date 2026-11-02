@@ -100,7 +100,7 @@
   - MAC アドレス: melonDS の既定（00:09:BF:11:22:33）だと相手と同じになるので、設定ファイルの lan_mac（なければ 00:09:BF＋ランダム3バイトを作って追記）を MakeConsole でファームウェアに書く（UpdateChecksums）。ヘッドレスは LAN を使うときだけ。
   - ポーズメニュー LAN 通信（PAGE_LAN）: このDS（名前は機種名＋MAC の末尾）、部屋を作る（4人まで）、部屋に入る（見つかった部屋の一覧、30フレームごとに更新）、抜ける、ホスト中はアドレスと参加者。止まっている間（メニュー）はメインスレッドで、動いている間は runFrames の中で LAN の Process を呼ぶ（同時には呼ばない）。
   - Switch: libnx のソケットは SwitchPlatform::StartNetwork（RetroAchievements と共通）で始める。
-  - テスト用 `--lan-host N` / `--lan-join ADDRESS`。WSL で2つのヘッドレスを 127.0.0.1 でつなぎ、2人の部屋になることを確認。ゲーム内の無線（C-Gear など）での通信は未確認（手元のブラックのセーブは C-Gear をもらう前で、HG のセーブはポケモンセンターから遠い）。
+  - テスト用 `--lan-host N` / `--lan-join ADDRESS`。WSL で2つのヘッドレスを 127.0.0.1 でつなぎ、2人の部屋になることを確認。ゲーム内の無線も確認: ユーザーの C-Gear 入手後のブラックのセーブ（Downloads/black-jp.sav、WSL の /root/work/bkc.sav）で2つ起動し、続きから始めて C-Gear の電源（下画面右下、タッチ 220,170）→「はい」（タッチ 210,60）にすると、両方が10秒あたり約30パケット送り約20受け取る（LAN なしでは0）。
 - WSL（Ubuntu-24.04）を入れた: `wsl -d Ubuntu-24.04 -u root`。/root/fulldex（Windows のクローンから git clone）、/root/work（ROM とセーブのコピー、IRBJ.txt）。Git Bash からは MSYS_NO_PATHCONV=1 を付けて、スクリプトをファイルで渡す。表だけ＋JIT のビルドは数分。
 - 本家（upstream/main）に未取り込みのコミットが8つある（11/1〜2 のホットフィックス：暗い洞窟、フェード、HGSS 図鑑、アップデーターなど）。
 - 未確認・今後: ほかの作品（ホワイト、ブラック2、プラチナ、SS/HG）の PS5 での動作、ときどき落ちるフレーム、終了後に黒い画面が残らないか（インタプリタで重い可能性）、JIT（sceKernelJitCreateSharedMemory 等）。
