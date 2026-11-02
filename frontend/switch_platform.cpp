@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include <switch.h>
+#include <mutex>
 
 #include "testrun.h"
 // (stb_image's code here, for the game list's pictures: only JPEG and PNG.)
@@ -960,6 +961,14 @@ bool Start(int& argc, char**& argv)
 }
 
 bool CanChangeGame() { return g_canChange && envHasNextLoad(); }
+
+bool StartNetwork()
+{
+    static std::once_flag once;
+    static bool ok = false;
+    std::call_once(once, [] { ok = R_SUCCEEDED(socketInitializeDefault()); });
+    return ok;
+}
 void ChangeGame() { g_changeGame = true; }
 
 bool LocalTime(int& year, int& month, int& day, int& hour, int& minute, int& second)

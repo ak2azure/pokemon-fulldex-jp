@@ -2,6 +2,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
@@ -11,6 +12,7 @@
 #include "Platform.h"
 #include "SPI_Firmware.h"
 #include "SsrThreads.h"
+#include "net/MPInterface.h"
 #include "host.h"
 #ifdef __ANDROID__
 #include <dlfcn.h>
@@ -181,15 +183,26 @@ void WriteGBASave(const u8*, u32, u32, u32, void*) {}
 void WriteFirmware(const Firmware&, u32, u32, void*) {}
 void WriteDateTime(int, int, int, int, int, int, void*) {}
 
-void MP_Begin(void*) {}
-void MP_End(void*) {}
-int MP_SendPacket(u8*, int, u64, void*) { return 0; }
-int MP_RecvPacket(u8*, u64*, void*) { return 0; }
-int MP_SendCmd(u8*, int, u64, void*) { return 0; }
-int MP_SendReply(u8*, int, u64, u16, void*) { return 0; }
-int MP_SendAck(u8*, int, u64, void*) { return 0; }
-int MP_RecvHostPacket(u8*, u64*, void*) { return 0; }
-u16 MP_RecvReplies(u8*, u64, u16, void*) { return 0; }
+// The DS's local wireless: to melonDS's LAN play when LAN PLAY is on (frontend/lanplay.h), else
+// to the core's do-nothing default (no other DS about). One DS in this program: instance 0.
+// The packets are counted for game.log (LanPlay::Process).
+std::atomic<uint32_t> MPSent { 0 }, MPReceived { 0 };
+static int CountSent(int n) { if (n > 0) MPSent++; return n; }
+static int CountReceived(int n) { if (n > 0) MPReceived++; return n; }
+void MP_Begin(void*) { MPInterface::Get().Begin(0); }
+void MP_End(void*) { MPInterface::Get().End(0); }
+int MP_SendPacket(u8* data, int len, u64 timestamp, void*) { return CountSent(MPInterface::Get().SendPacket(0, data, len, timestamp)); }
+int MP_RecvPacket(u8* data, u64* timestamp, void*) { return CountReceived(MPInterface::Get().RecvPacket(0, data, timestamp)); }
+int MP_SendCmd(u8* data, int len, u64 timestamp, void*) { return CountSent(MPInterface::Get().SendCmd(0, data, len, timestamp)); }
+int MP_SendReply(u8* data, int len, u64 timestamp, u16 aid, void*) { return CountSent(MPInterface::Get().SendReply(0, data, len, timestamp, aid)); }
+int MP_SendAck(u8* data, int len, u64 timestamp, void*) { return CountSent(MPInterface::Get().SendAck(0, data, len, timestamp)); }
+int MP_RecvHostPacket(u8* data, u64* timestamp, void*) { return CountReceived(MPInterface::Get().RecvHostPacket(0, data, timestamp)); }
+u16 MP_RecvReplies(u8* data, u64 timestamp, u16 aidmask, void*)
+{
+    const u16 got = MPInterface::Get().RecvReplies(0, data, timestamp, aidmask);
+    if (got) MPReceived++;
+    return got;
+}
 int Net_SendPacket(u8*, int, void*) { return 0; }
 int Net_RecvPacket(u8*, void*) { return 0; }
 

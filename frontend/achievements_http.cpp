@@ -20,6 +20,7 @@
 #include <mutex>
 #include <switch.h>
 #include <curl/curl.h>
+#include "switch_platform.h"
 #endif
 
 namespace Achievements
@@ -324,10 +325,9 @@ size_t Write(char* data, size_t size, size_t count, void* user)
 bool HttpPost(const std::string& url, const std::string& post, const std::string& contentType,
               const std::string& userAgent, int& status, std::string& body, std::string& error)
 {
-    // The console's network (libnx's sockets), started the first time it is needed and left
-    // open: the program ends with the console's own exit, which closes it.
+    // The console's network (libnx's sockets, SwitchPlatform::StartNetwork: LAN PLAY's too).
     std::call_once(g_curlInit, [] {
-        if (R_FAILED(socketInitializeDefault())) return;
+        if (!SwitchPlatform::StartNetwork()) return;
         g_curlOk = curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK;
     });
     if (!g_curlOk) { error = "no network (sockets)"; return false; }

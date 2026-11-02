@@ -246,6 +246,7 @@ struct PadState
 #include "touchpad.h"
 #include "controls.h"
 #include "cheats.h"
+#include "lanplay.h"
 
 static int PadButtonFromName(const std::string& n)
 {
@@ -483,6 +484,8 @@ struct Options
     bool layoutGiven = false;
     bool audioStats = false;
     std::string audioDump;               // write the game's sound to this file (raw)
+    int lanHost = 0;                     // LAN PLAY from the start: host for this many DSes
+    std::string lanJoin;                 // ... or join the host at this address
     int interp60 = -1;                   // 3D frame interpolation: -1 = from settings (off when headless)
     int gpu3d = -1;                      // 3D on the graphics chip: -1 = from settings (off when headless)
     bool battleMash = false;             // test aid: tap A through battles, pausing the script meanwhile
@@ -551,6 +554,8 @@ static void Usage()
         "  --count-changes      report on how many frames the top screen image changed\n"
         "  --audio-stats        print the peak and RMS level of the generated audio at exit\n"
         "  --audio-dump FILE    write the game's sound to FILE (raw 16-bit stereo, the DS's rate)\n"
+        "  --lan-host N         LAN PLAY: host a session for N DSes from the start (tests)\n"
+        "  --lan-join ADDRESS   LAN PLAY: join the session hosted at ADDRESS from the start (tests)\n"
         "  --shot-layers        with each screenshot, also write layers_<frame>.png colouring every\n"
         "                       pixel by the 2D layer it came from\n"
 
@@ -579,6 +584,8 @@ static bool ParseArgs(int argc, char** argv, Options& o)
         else if (a == "--config") o.config = next();
         else if (a == "--audio-stats") o.audioStats = true;
         else if (a == "--audio-dump") o.audioDump = next();
+        else if (a == "--lan-host") o.lanHost = atoi(next().c_str());
+        else if (a == "--lan-join") o.lanJoin = next();
         else if (a == "--shot-layers") o.shotLayers = true;
         else if (a == "--count-changes") o.countChanges = true;
         else if (a == "--battle-mash") o.battleMash = true;
@@ -858,6 +865,11 @@ static void ApplyRenderer3D(NDS& nds, bool gpu)
 // can move what achievements read.
 static bool AchievementsOn = false;
 
+// This installation's MAC address for LAN PLAY (frontend/lanplay.h), given to each console's
+// firmware: set in main from the settings file before the first console is made.
+static std::array<uint8_t, 6> LanMac;
+static bool LanMacSet = false;
+
 static std::unique_ptr<NDS> MakeConsole(const std::vector<uint8_t>& rom, const std::vector<uint8_t>& sav, bool fixedClock)
 {
     // Black 2 and White 2 (US) get 8 MB of main RAM, for their wider map (frontend/bw2map.h).
@@ -886,6 +898,13 @@ static std::unique_ptr<NDS> MakeConsole(const std::vector<uint8_t>& rom, const s
     }
     else args.JIT = std::nullopt;
     auto nds = std::make_unique<NDS>(std::move(args));
+    if (LanMacSet)
+    {
+        // (Read by the games when they start the wireless, not before.)
+        Firmware& fw = nds->GetFirmware();
+        fw.GetHeader().MacAddr = LanMac;
+        fw.UpdateChecksums();
+    }
 #ifdef JIT_ENABLED
     UseFastMem = UseJit && nds->JIT.FastMemoryEnabled();
 #endif
@@ -1331,6 +1350,7 @@ struct Settings
     // VOLUME: the game's sound and music, 0 (off) to 100 in tens.
     int volume = 100;
     std::string listColour, listBackground, listLanguage, listSounds; // (GAME LIST: COLOUR, BACKGROUND, LANGUAGE, MENU SOUNDS)
+    std::string lanMac; // (LAN PLAY's MAC address, frontend/lanplay.h: kept as it is)
     bool cpuBoost = true; // Switch only: the processor's boost mode (see SwitchPlatform)
     bool jit = true;      // Switch, games that are not recompiled: melonDS's JIT (read at start-up)
     bool fastMem = true;  // ... and its fast memory (also read at start-up)
@@ -1406,6 +1426,7 @@ struct Settings
             else if (k == "list_background") listBackground = v;
             else if (k == "list_language") { listLanguage = v; I18n::SetLanguage(v); }
             else if (k == "list_sounds") listSounds = v;
+            else if (k == "lan_mac") lanMac = v;
             else if (k == "ff_low_res") ffLowRes = v == "1";
             else if (k == "start_button") startMenu = v != "ds";
             else if (k == "cpu_boost") cpuBoost = v == "1";
@@ -1458,6 +1479,7 @@ struct Settings
         if (!listBackground.empty()) f << "list_background=" << listBackground << "\n";
         if (!listLanguage.empty()) f << "list_language=" << listLanguage << "\n";
         if (!listSounds.empty()) f << "list_sounds=" << listSounds << "\n";
+        if (!lanMac.empty()) f << "lan_mac=" << lanMac << "\n";
         f << "start_button=" << (startMenu ? "menu" : "ds") << "\n";
         f << "battle_buttons=" << (battleButtons == 0 ? "corner" : battleButtons == 2 ? "panel" : "strip") << "\n";
         controls.Save(f);
@@ -1593,6 +1615,12 @@ int main(int argc, char** argv)
     {
         UseJit = true;
         opt.recomp = false;
+    }
+    // (Headless tests keep melonDS's default address unless they use LAN PLAY.)
+    if (!opt.config.empty() && (!opt.headless || opt.lanHost > 0 || !opt.lanJoin.empty()))
+    {
+        LanMac = LanPlay::MacFor(opt.config);
+        LanMacSet = true;
     }
 #ifdef __SWITCH__
     fprintf(stderr, "[switch] emulation: %s\n", UseJit ? "JIT" : opt.recomp ? "recompiled code" : "interpreter");
@@ -4033,11 +4061,16 @@ int main(int argc, char** argv)
         M_CONTROLS, M_STARTBTN, M_FAST, M_FFLOWRES, M_SAVESTATE, M_LOADSTATE, M_RESET, M_QUIT,
         M_DISPLAY, M_SOUND, M_GRAPHICS, M_CONTROLMENU, M_BACK, M_CHEATS, M_NOTHING,
         M_VOLUME, M_RA, M_RA_ON, M_RA_ACCOUNT, M_RA_GAME, M_RA_LOGIN, M_RA_TYPED, M_RA_CANCEL, M_BOTHVER,
-        M_RA_LIST, M_ACH_POINTS, M_ACH_STATUS, M_ACH_RARITY,
+        M_RA_LIST, M_ACH_POINTS, M_ACH_STATUS, M_ACH_RARITY, M_LAN, M_LAN_HOST, M_LAN_SEARCH, M_LAN_LEAVE,
         M_CHEAT0 = 1000, // (M_CHEAT0 + i: cheat i, CHEATS)
+        M_LAN_JOIN0 = 2000, // (M_LAN_JOIN0 + i: the i-th host found, LAN PLAY)
         M_ACH0 = 30000   // (M_ACH0 + i: achievement i, ACHIEVEMENTS)
     };
-    enum { PAGE_MAIN, PAGE_KEYS, PAGE_DISPLAY, PAGE_GRAPHICS, PAGE_CONTROLS, PAGE_CHEATS, PAGE_RA, PAGE_SOUND, PAGE_RA_LIST, PAGE_RA_DETAIL };
+    enum { PAGE_MAIN, PAGE_KEYS, PAGE_DISPLAY, PAGE_GRAPHICS, PAGE_CONTROLS, PAGE_CHEATS, PAGE_RA, PAGE_SOUND, PAGE_RA_LIST, PAGE_RA_DETAIL,
+           PAGE_LAN };
+    // LAN PLAY (lanplay.h): the hosts found while JOIN looks, as the page last showed them.
+    std::vector<LanPlay::Host> lanHosts;
+    const std::string lanName = LanPlay::PlayerName(LanMac);
     // ACHIEVEMENTS (RETROACHIEVEMENTS' list): read from the set as the page opens.
     std::vector<Achievements::Row> achList;
     int achDetail = -1; // the one ACHIEVEMENTS' details are shown for (A on it)
@@ -4118,6 +4151,13 @@ int main(int argc, char** argv)
             add(M_CHEATS, "CHEATS", cheats.On() ? std::to_string(cheats.On()) + " ON" : "");
             if (exclusives.Supported()) add(M_BOTHVER, "OTHER VERSION POKEMON", onOff(exclusives.on));
             if (Achievements::Available()) add(M_RA, "RETROACHIEVEMENTS", onOff(cfg.ra.on));
+            {
+                const LanPlay::State st = LanPlay::Now();
+                const size_t n = LanPlay::Players().size();
+                add(M_LAN, "LAN PLAY", st == LanPlay::HOSTING ? "HOSTING " + std::to_string(n)
+                                     : st == LanPlay::JOINED ? "JOINED " + std::to_string(n)
+                                     : st == LanPlay::SEARCHING ? std::string("LOOKING") : std::string("OFF"));
+            }
             add(M_RESET, "RESET GAME", "");
             add(M_QUIT, "QUIT", "");
         }
@@ -4138,6 +4178,36 @@ int main(int argc, char** argv)
             add(M_BATTLEBUTTONS, "BATTLE BUTTONS",
                 !funcWatchOn || pt.on ? "-" : cfg.battleButtons == 2 ? "PANEL" : cfg.battleButtons == 0 || !bw1.on ? "CORNER" : "STRIP");
             add(M_SHOWFPS, "FPS COUNTER", onOff(cfg.showFps));
+            add(M_BACK, "BACK", "");
+        }
+        else if (menuPage == PAGE_LAN)
+        {
+            // HOST, or JOIN (the hosts on the network, as they are found); then the players, and
+            // LEAVE. The games use it as they would another DS: their Wireless Club, Union Room,
+            // trades and battles.
+            const LanPlay::State st = LanPlay::Now();
+            add(M_NOTHING, "THIS DS", lanName, true);
+            if (st == LanPlay::OFF)
+            {
+                add(M_LAN_HOST, "HOST", "");
+                add(M_LAN_SEARCH, "JOIN", "");
+            }
+            else if (st == LanPlay::SEARCHING)
+            {
+                lanHosts = LanPlay::Hosts();
+                if (lanHosts.empty()) add(M_NOTHING, "LOOKING FOR HOSTS...", "", true);
+                for (size_t i = 0; i < lanHosts.size() && i < 16; i++)
+                    add(M_LAN_JOIN0 + (int)i, lanHosts[i].name.c_str(),
+                        std::to_string(lanHosts[i].players) + "/" + std::to_string(lanHosts[i].max));
+                add(M_LAN_LEAVE, "STOP LOOKING", "");
+            }
+            else
+            {
+                // (Hosting: the address another melonDS can join with its DIRECT CONNECT.)
+                if (st == LanPlay::HOSTING) add(M_NOTHING, "ADDRESS", LanPlay::LocalAddress(), true);
+                for (const std::string& p : LanPlay::Players()) add(M_NOTHING, st == LanPlay::HOSTING ? "HOSTING" : "JOINED", p, true);
+                add(M_LAN_LEAVE, "LEAVE", "");
+            }
             add(M_BACK, "BACK", "");
         }
         else if (menuPage == PAGE_SOUND)
@@ -4503,6 +4573,7 @@ int main(int argc, char** argv)
         emuGot = 0;
         for (int i = 0; i < emuSpeed; i++)
         {
+            LanPlay::Process();
             // (The widescreen world drawn during a frame is shown after the next one.)
             rc_frame_hidden = !ffFull && emuSpeed > 1 && i < emuSpeed - 1;
             rc_wide_render_skip = !ffFull && emuSpeed > 1 && i < emuSpeed - 2;
@@ -5416,7 +5487,7 @@ int main(int argc, char** argv)
             if (nav.back && menuPage != PAGE_MAIN)
             {
                 backTo = menuPage == PAGE_DISPLAY ? M_DISPLAY : menuPage == PAGE_SOUND ? M_SOUND : menuPage == PAGE_GRAPHICS ? M_GRAPHICS
-                       : menuPage == PAGE_CHEATS ? M_CHEATS : menuPage == PAGE_RA ? M_RA : M_CONTROLMENU;
+                       : menuPage == PAGE_CHEATS ? M_CHEATS : menuPage == PAGE_RA ? M_RA : menuPage == PAGE_LAN ? M_LAN : M_CONTROLMENU;
                 nav = MenuInput();
             }
             else if (nav.back)
@@ -5443,8 +5514,27 @@ int main(int argc, char** argv)
                 Achievements::SetCheats(cheats.On() > 0 || exclusives.on);
                 fprintf(stderr, "[cheats] %s %s\n", cheats.items[id - M_CHEAT0].key.c_str(), cheats.items[id - M_CHEAT0].on ? "on" : "off");
             }
+            if (id >= M_LAN_JOIN0 && id - M_LAN_JOIN0 < (int)lanHosts.size())
+            {
+                const LanPlay::Host h = lanHosts[(size_t)(id - M_LAN_JOIN0)];
+                say(LanPlay::Join(lanName, h.address) ? "JOINED " + h.name : "COULD NOT JOIN " + h.name);
+            }
             switch (id)
             {
+            case M_LAN:
+                goPage(PAGE_LAN, -1);
+                hit = -1;
+                break;
+            case M_LAN_HOST:
+                // (Four DSes at most: the Union Room's own number.)
+                say(LanPlay::StartHost(lanName, 4) ? std::string("HOSTING: THE OTHERS CAN JOIN NOW") : std::string("COULD NOT HOST"));
+                break;
+            case M_LAN_SEARCH:
+                LanPlay::Search();
+                break;
+            case M_LAN_LEAVE:
+                LanPlay::Leave();
+                break;
             case M_BOTHVER:
                 // (Achievements are not followed while it is on, as with a cheat: the other
                 // version's Pokemon are for the other version's players.)
@@ -5516,7 +5606,7 @@ int main(int argc, char** argv)
                 }
                 if (backTo < 0)
                     backTo = menuPage == PAGE_DISPLAY ? M_DISPLAY : menuPage == PAGE_SOUND ? M_SOUND : menuPage == PAGE_GRAPHICS ? M_GRAPHICS
-                           : menuPage == PAGE_CHEATS ? M_CHEATS : menuPage == PAGE_RA ? M_RA : M_CONTROLMENU;
+                           : menuPage == PAGE_CHEATS ? M_CHEATS : menuPage == PAGE_RA ? M_RA : menuPage == PAGE_LAN ? M_LAN : M_CONTROLMENU;
                 goPage(PAGE_MAIN, backTo);
                 hit = -1;
                 break;
@@ -5699,6 +5789,15 @@ int main(int argc, char** argv)
         if (menu.open && menuPage == PAGE_RA && !raTyping && frame % 20 == 0) buildMenu();
 
         bool paused = menu.open;
+        if (paused) LanPlay::Process();
+        if (menu.open && menuPage == PAGE_LAN && frame % 30 == 0) buildMenu();
+        if (!opt.lanJoin.empty() && LanPlay::Now() == LanPlay::OFF && frame % 120 == 0) LanPlay::Join(lanName, opt.lanJoin);
+        static bool lanHostStarted = false;
+        if (opt.lanHost > 0 && !lanHostStarted)
+        {
+            lanHostStarted = true;
+            LanPlay::StartHost(lanName, opt.lanHost);
+        }
         int speed = 1;
         if (!paused && !swallowMenuButtons)
         {

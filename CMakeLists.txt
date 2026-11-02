@@ -104,11 +104,27 @@ file(GLOB_RECURSE SSR_RCHEEVOS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/frontend/thi
 add_library(rcheevos STATIC ${SSR_RCHEEVOS_SOURCES})
 target_include_directories(rcheevos PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/frontend/thirdparty/rcheevos/include")
 
+# LAN play (frontend/lanplay.h): melonDS's own (melonDS/src/net/LAN.cpp, the DS's local wireless
+# between programs on one network, which melonDS itself speaks too), over ENet
+# (frontend/thirdparty/enet, MIT). (melonDS's other network parts, its Wi-Fi to the internet,
+# are not built.)
+add_library(enet STATIC
+    frontend/thirdparty/enet/callbacks.c frontend/thirdparty/enet/compress.c frontend/thirdparty/enet/host.c
+    frontend/thirdparty/enet/list.c frontend/thirdparty/enet/packet.c frontend/thirdparty/enet/peer.c
+    frontend/thirdparty/enet/protocol.c frontend/thirdparty/enet/unix.c frontend/thirdparty/enet/win32.c)
+target_include_directories(enet PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/frontend/thirdparty/enet/include")
+if(WIN32)
+    target_link_libraries(enet PUBLIC ws2_32 winmm)
+endif()
+
 set(SSRECOMP_SOURCES
     frontend/main.cpp
     frontend/achievements.cpp
     frontend/achievements_http.cpp
     frontend/platform.cpp
+    melonDS/src/net/LAN.cpp
+    melonDS/src/net/LocalMP.cpp
+    melonDS/src/net/MPInterface.cpp
     runtime/recomp_rt.cpp
     runtime/recomp_mem.cpp
     "${SSR_GENERATED_DIR}/apps_table.cpp"
@@ -388,7 +404,7 @@ if(SSR_GBA_DIR AND (SSR_PC_ALL_GAMES OR SSR_ALL_GAMES))
 endif()
 # RetroAchievements: the library, and each platform's way to the internet (achievements_http.cpp);
 # the program's version, which the server is told with its name, from CHANGELOG.md's newest release.
-target_link_libraries(ssrecomp PRIVATE rcheevos)
+target_link_libraries(ssrecomp PRIVATE rcheevos enet)
 if(WIN32)
     target_link_libraries(ssrecomp PRIVATE winhttp)
 elseif(APPLE)

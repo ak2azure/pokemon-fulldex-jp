@@ -36,6 +36,11 @@ bool StartThread(void (*entry)(void*), void* arg);
 void JoinThread();
 void MoveMainThread();
 
+// The console's network (libnx's sockets), started the first time something needs it (LAN PLAY,
+// RetroAchievements) and left open: the program ends with the console's exit, which closes it.
+// False if it could not start.
+bool StartNetwork();
+
 // Called last: the next start (the game list again, or the next test run).
 void Finish();
 

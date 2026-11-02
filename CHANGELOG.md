@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **LAN PLAY** (pause menu): the DS's local wireless with another program on the same network,
+  for trades, battles and the Union Room: another copy of this one or melonDS 1.1 itself (its
+  own LAN play). One hosts (HOST), the others join it (JOIN shows the hosts found; or melonDS's
+  DIRECT CONNECT to the address shown). Each installation now has a DS address of its own.
 - **The game list has HeartGold and SoulSilver's menu sounds** (the cursor, choosing a game,
   opening and closing the settings), taken from your own ROM of either when one is in the list.
   GAME LIST: MENU SOUNDS turns them off; they follow SOUND: VOLUME.

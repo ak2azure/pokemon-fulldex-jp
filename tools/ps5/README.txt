@@ -20,6 +20,11 @@ its corner says why.
 Saves go in /data/pokemon-ds-wide/saves, the settings in settings.cfg and the log in game.log
 beside them (send game.log with a bug report). QUIT in the pause menu goes back to the game list.
 
+LAN PLAY in the pause menu: trades and battles with melonDS 1.1 on a PC (or another copy of this
+program) on the same network. One side hosts: on the PC, melonDS's Multiplayer > Host LAN game;
+here, LAN PLAY > HOST (melonDS joins with Join LAN game, or Direct connect to the ADDRESS shown).
+The other joins: here, LAN PLAY > JOIN and pick the host. Do not fast forward while connected.
+
 The games run on a JIT (on the interpreter if the console does not allow it; game.log says
 which), and the picture is drawn by the PS5's graphics chip.
 
@@ -45,4 +50,9 @@ ShadowMountPlus が動いている必要があります。
 
 セーブは /data/pokemon-ds-wide/saves、設定は settings.cfg、ログは game.log です。
 ポーズメニューの終了でゲーム一覧に戻ります。
+ポーズメニューの LAN 通信: 同じネットワークの PC の melonDS 1.1 (またはこのプログラム) と通信交換・
+対戦ができます。片方が部屋を作ります: PC の melonDS ではメニューの Multiplayer > Host LAN game、
+こちらでは LAN 通信 > 部屋を作る (melonDS からは Join LAN game、または表示されたアドレスに Direct connect)。
+もう片方が入ります: こちらでは LAN 通信 > 部屋に入る で部屋を選びます。つながっている間は早送りしないでください。
+
 ゲームは JIT で動き (使えない本体ではインタプリタ。どちらかは game.log に出ます)、画面は PS5 の GPU で描きます。

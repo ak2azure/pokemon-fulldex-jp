@@ -95,6 +95,12 @@
   - pc_launcher.cpp / switch_platform.cpp: ループの前後で状態（タブ、選択、設定ページの位置と中身、開いている窓）を比べて音を選ぶ。設定 GAME LIST: MENU SOUNDS（list_sounds、既定オン）と SOUND: VOLUME に従う。
   - 合わせ方: `--audio-dump FILE`（テスト用、ゲームの音を生の 16bit ステレオで書き出す）で HG の音を録り、押した版と押さない版の差で効果音だけを取り出して比べた。音の高さは一致。音量は、ベロシティだけ 2乗の曲線（40log）、トラック音量・エクスプレッション・シーケンス音量は 20log にすると WIN_OPEN が時間ごとに 1.4dB 以内で一致（全部 40log だと 11dB 小さく、音量変化が深すぎた）。全体のゲイン 1.65。
   - WSL での確認: PC 全ゲーム版（build-all、SSR_PC_ALL_GAMES）を SDL_AUDIODRIVER=disk と xdotool で動かし、移動5回でカーソル音5回、設定の開閉で WIN_OPEN と GEARCANCEL を確認。
+- LAN 通信（11/2、実機未確認）: melonDS 1.1 の LAN（melonDS/src/net/LAN.cpp、ENet、ポート 7064、部屋の告知は UDP 7063、プロトコル版 1）をそのまま使う。本家 melonDS 1.1（2025-11 の最新リリース）と同じなので、PC の melonDS とつながるはず。melonDS の LocalMP は1つのプログラムの中の複数台用なので、プログラム2つの通信には使えない。Android の melonDS（rafaelvcaetano）は README の Missing Features に Local Multiplayer があり、通信できない。
+  - ENet 1.3.18 を frontend/thirdparty/enet に入れた（MIT）。CMake で enet と net/LAN.cpp・LocalMP.cpp・MPInterface.cpp をビルド。platform.cpp の MP_* は MPInterface（LAN を使っていなければ何もしない DummyMP）へ。送受信の数を数え、`frontend/lanplay.h` の Process が10秒ごとに game.log へ書く。
+  - MAC アドレス: melonDS の既定（00:09:BF:11:22:33）だと相手と同じになるので、設定ファイルの lan_mac（なければ 00:09:BF＋ランダム3バイトを作って追記）を MakeConsole でファームウェアに書く（UpdateChecksums）。ヘッドレスは LAN を使うときだけ。
+  - ポーズメニュー LAN 通信（PAGE_LAN）: このDS（名前は機種名＋MAC の末尾）、部屋を作る（4人まで）、部屋に入る（見つかった部屋の一覧、30フレームごとに更新）、抜ける、ホスト中はアドレスと参加者。止まっている間（メニュー）はメインスレッドで、動いている間は runFrames の中で LAN の Process を呼ぶ（同時には呼ばない）。
+  - Switch: libnx のソケットは SwitchPlatform::StartNetwork（RetroAchievements と共通）で始める。
+  - テスト用 `--lan-host N` / `--lan-join ADDRESS`。WSL で2つのヘッドレスを 127.0.0.1 でつなぎ、2人の部屋になることを確認。ゲーム内の無線（C-Gear など）での通信は未確認（手元のブラックのセーブは C-Gear をもらう前で、HG のセーブはポケモンセンターから遠い）。
 - WSL（Ubuntu-24.04）を入れた: `wsl -d Ubuntu-24.04 -u root`。/root/fulldex（Windows のクローンから git clone）、/root/work（ROM とセーブのコピー、IRBJ.txt）。Git Bash からは MSYS_NO_PATHCONV=1 を付けて、スクリプトをファイルで渡す。表だけ＋JIT のビルドは数分。
 - 本家（upstream/main）に未取り込みのコミットが8つある（11/1〜2 のホットフィックス：暗い洞窟、フェード、HGSS 図鑑、アップデーターなど）。
 - 未確認・今後: ほかの作品（ホワイト、ブラック2、プラチナ、SS/HG）の PS5 での動作、ときどき落ちるフレーム、終了後に黒い画面が残らないか（インタプリタで重い可能性）、JIT（sceKernelJitCreateSharedMemory 等）。

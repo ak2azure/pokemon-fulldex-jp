@@ -102,6 +102,10 @@ inline std::string Find(const std::string& s, int depth = 0)
         { "UNLOCKED ", "達成 ", true },
         { "SO FAR ", "進行 ", true },
         { "% OF PLAYERS", "%のプレイヤー", false },
+        { "HOSTING ", "ホスト中 ", true }, // (LAN PLAY: the session and its players)
+        { "JOINED ", "参加中 ", true },
+        { "COULD NOT JOIN ", "参加できません: ", true },
+        { " (YOU)", " (自分)", false },
     };
     for (const auto& a : affixes)
     {
