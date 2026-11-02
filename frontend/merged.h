@@ -582,8 +582,12 @@ inline bool MergedWideCovers(const WideImage& wide, const MergedView& v, int out
 // ground ending where the game stopped drawing it), each row goes on in the last colour drawn
 // on the way out from the screen's edge. Rows that have nothing drawn at the edge itself (the
 // sky of a 2D background behind the world) are left as they are: what continues there is the
-// screen's own edge (MergedEdgeContinuation). In px: a copy; screenX0, screenX1: the columns
-// of the picture where the DS's screen begins and ends.
+// screen's own edge (MergedEdgeContinuation). Nor are rows where the world already ends inside
+// the screen (more than a thirty-second of the screen's width drawn nothing: a room indoors,
+// the black beside it): there the nothing beyond the room's wall beside the screen is real,
+// and was filled with the wall's last column, drawn out into streaks (HeartGold's and
+// Platinum's houses). In px: a copy; screenX0, screenX1: the columns of the picture where the
+// DS's screen begins and ends.
 inline const uint32_t* MergedFillWideHoles(const WideImage& wide, int screenX0, int screenX1, std::vector<uint32_t>& px)
 {
     const int w = wide.w, h = wide.h;
@@ -597,9 +601,13 @@ inline const uint32_t* MergedFillWideHoles(const WideImage& wide, int screenX0, 
     }
     if (!holes) return wide.pixels;
     px.assign(wide.pixels, wide.pixels + (size_t)w * h);
+    const int endsInside = std::max(2, (screenX1 - screenX0) / 32);
     for (int y = 0; y < h; y++)
     {
         uint32_t* row = &px[(size_t)y * w];
+        int nothing = 0;
+        for (int x = screenX0; x < screenX1; x++) nothing += !(row[x] >> 24);
+        if (nothing > endsInside) continue;
         uint32_t last = 0;
         for (int x = screenX0 - 1; x >= 0; x--)
         {
