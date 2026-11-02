@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **PS5: an app on the Home screen.** Copied to /data/homebrew/PKFD00001, ShadowMountPlus adds
+  Pokémon Fulldex to the Home screen, and it starts without websrv (it needs an ELF loader on
+  port 9021, such as etaHEN's). QUIT goes back to the game list that way too.
 - **PS5: QUIT in the pause menu goes back to the game list** instead of ending the program.
 - **60 FPS in-between frames while running past things close to the camera** (Black's rocks):
   their faces no longer split apart with the ground showing through, every other frame.
