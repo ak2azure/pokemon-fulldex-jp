@@ -293,6 +293,10 @@ struct WideAccess
         std::vector<s32> Partner;
         std::vector<u8> KeepStrip;
         u32 Matched;
+        // The camera's movement in clip coordinates (the same for near and far polygons, which
+        // move unlike on the screen): the mean over the pairs, what an unpaired polygon is
+        // moved back by half of.
+        s64 SceneX, SceneY, SceneW;
     };
 
     // Pairs the polygons of rawCur with those of rawPrev, for an in-between frame. The same for
@@ -305,7 +309,7 @@ struct WideAccess
         typedef GPU3D::RawPolygon RawPolygon;
         // Polygons are matched in submission order. When the two frames do not line up (an
         // object entered or left), the search skips ahead a little; an unmatched polygon is
-        // drawn at its new position.
+        // moved back by half the scene's movement (Replay).
         auto sameKind = [](const RawPolygon& a, const RawPolygon& b) {
             return a.PolygonMode == b.PolygonMode && a.PolygonAttr == b.PolygonAttr &&
                 a.TexParam == b.TexParam && a.TexPalette == b.TexPalette;
@@ -334,12 +338,37 @@ struct WideAccess
             my = sum[1] / nverts;
             return true;
         };
+        // The camera moves the whole scene by the same amount in clip coordinates, but on the
+        // screen (divided by depth) the near polygons move further than the far ones: running
+        // past Black's rocks, the rock in front moved four to sixteen times as far as the
+        // scene's usual polygon. So the scene's movement is measured in clip coordinates,
+        // scaled by a typical depth (`ref`) to Pair's units.
+        s64 ref = 4096;
+        if (!rawCur.empty())
+        {
+            static thread_local std::vector<s32> depths;
+            depths.clear();
+            const size_t step = rawCur.size() > 256 ? rawCur.size() / 256 : 1;
+            for (size_t i = 0; i < rawCur.size(); i += step)
+                depths.push_back(std::abs(rawCur[i].Vertices[0].Position[3]));
+            std::nth_element(depths.begin(), depths.begin() + depths.size() / 2, depths.end());
+            ref = std::max<s64>(4096, depths[depths.size() / 2]);
+        }
+        auto clipMove = [ref](const RawPolygon& a, const RawPolygon& b, int nverts, s64& mx, s64& my) {
+            s64 sum[2] = { 0, 0 };
+            for (int i = 0; i < nverts; i++)
+                for (int c = 0; c < 2; c++)
+                    sum[c] += (s64)b.Vertices[i].Position[c] - a.Vertices[i].Position[c];
+            mx = sum[0] * 512 / (ref * nverts);
+            my = sum[1] * 512 / (ref * nverts);
+        };
         // How far a pairing is from what the rest of the picture does: the scene as a whole
         // moves with the camera, so the right partner of a polygon is the one that moved
         // like its neighbours, not the nearest one. (Taking the nearest paired a polygon
         // with a different one of the same model whenever the picture moved by more than
         // half the distance between them: running, and most at the bottom of the screen.)
-        auto unlike = [](const RawPolygon& a, const RawPolygon& b, int nverts, s64 rx, s64 ry) -> s64 {
+        // rx, ry: the scene's movement at depth `ref`, which is rx * ref / w at depth w.
+        auto unlike = [ref](const RawPolygon& a, const RawPolygon& b, int nverts, s64 rx, s64 ry) -> s64 {
             s64 total = 0;
             for (int i = 0; i < nverts; i++)
             {
@@ -348,8 +377,8 @@ struct WideAccess
                 if (wb < 0) wb = -wb;
                 s64 w = (wa > wb ? wa : wb);
                 if (w < 4096) w = 4096;
-                s64 dx = ((s64)b.Vertices[i].Position[0] - a.Vertices[i].Position[0]) * 512 / w - rx;
-                s64 dy = ((s64)b.Vertices[i].Position[1] - a.Vertices[i].Position[1]) * 512 / w - ry;
+                s64 dx = (((s64)b.Vertices[i].Position[0] - a.Vertices[i].Position[0]) * 512 - rx * ref) / w;
+                s64 dy = (((s64)b.Vertices[i].Position[1] - a.Vertices[i].Position[1]) * 512 - ry * ref) / w;
                 total += (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy);
             }
             return total;
@@ -381,6 +410,8 @@ struct WideAccess
                     {
                         s64 mx, my;
                         if (!sameKind(rawPrev[k], cur) || !movement(rawPrev[k], cur, nverts, mx, my)) continue;
+                        clipMove(rawPrev[k], cur, nverts, mx, my);
+                        if (mx < -128 || mx > 128 || my < -128 || my > 128) continue;
                         const int bx = (int)(mx + 128) / 2, by = (int)(my + 128) / 2;
                         const int n = ++votes[by * 129 + bx];
                         if (n > best)
@@ -397,6 +428,7 @@ struct WideAccess
         out.Partner.assign(rawCur.size(), -1);
         out.KeepStrip.assign(rawCur.size(), 1);
         out.Matched = 0;
+        s64 sceneSum[3] = { 0, 0, 0 }, sceneVerts = 0;
         size_t ia = 0;
         s64 lastPair = -1;
         static const bool dbgPairOn = getenv("SSR_PAIR_DEBUG") != nullptr;
@@ -426,7 +458,8 @@ struct WideAccess
             // Without that limit, when a model leaves the picture the next model of the
             // same kind was paired with it and drawn halfway towards where it had been.
             static const bool loose = getenv("SSR_PAIR_LOOSE") != nullptr;
-            const s64 speed = (sceneX < 0 ? -sceneX : sceneX) + (sceneY < 0 ? -sceneY : sceneY);
+            const s64 depth = std::max<s64>(4096, std::abs((s64)cur.Vertices[0].Position[3]));
+            const s64 speed = ((sceneX < 0 ? -sceneX : sceneX) + (sceneY < 0 ? -sceneY : sceneY)) * ref / depth;
             const s64 limit = loose ? INT64_MAX : nverts * (12 + speed / 2);
             // First the polygon that follows the last partner: within an object the two
             // lists run in step, and that also pairs what moves by itself (a windmill's
@@ -459,6 +492,10 @@ struct WideAccess
             {
                 prev = &rawPrev[bestIndex];
                 ia = bestIndex + 1;
+                for (int i = 0; i < nverts; i++)
+                    for (int c = 0; c < 3; c++)
+                        sceneSum[c] += (s64)cur.Vertices[i].Position[c == 2 ? 3 : c] - prev->Vertices[i].Position[c == 2 ? 3 : c];
+                sceneVerts += nverts;
             }
             const s64 pairIndex = prev ? (s64)bestIndex : -1;
             const bool keepStrip = (pairIndex < 0 && lastPair < 0) || (pairIndex >= 0 && lastPair >= 0 && pairIndex == lastPair + 1);
@@ -475,6 +512,9 @@ struct WideAccess
             out.KeepStrip[ci] = keepStrip ? 1 : 0;
             if (prev) out.Matched++;
         }
+        out.SceneX = sceneVerts ? sceneSum[0] / sceneVerts : 0;
+        out.SceneY = sceneVerts ? sceneSum[1] / sceneVerts : 0;
+        out.SceneW = sceneVerts ? sceneSum[2] / sceneVerts : 0;
     }
 
     // Submits the recorded frame again into the given buffers. With `interpolate`, every
@@ -581,6 +621,20 @@ struct WideAccess
                             int d = v.TexCoords[c] - p.TexCoords[c];
                             if (!texStep[c] && d > -512 && d < 512) v.TexCoords[c] = (s16)((v.TexCoords[c] + p.TexCoords[c]) / 2);
                         }
+                    }
+                }
+                else if (pr->SceneX || pr->SceneY || pr->SceneW)
+                {
+                    // Unpaired: moved back by half the scene's movement, as its paired neighbours
+                    // are. Left at its new position it stood apart from them by half the camera's
+                    // movement: running past Black's rocks, a face of one jumped sideways on every
+                    // in-between frame and the ground showed through the gap.
+                    for (int i = 0; i < nverts; i++)
+                    {
+                        Vertex& v = g.TempVertexBuffer[i];
+                        v.Position[0] = (s32)(v.Position[0] - pr->SceneX / 2);
+                        v.Position[1] = (s32)(v.Position[1] - pr->SceneY / 2);
+                        v.Position[3] = (s32)(v.Position[3] - pr->SceneW / 2);
                     }
                 }
             }
