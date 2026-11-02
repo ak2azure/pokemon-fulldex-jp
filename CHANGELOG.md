@@ -5,6 +5,8 @@
 - **SoulSilver and HeartGold (Japanese): the battle buttons beside the message** show their whole
   labels (BAG, RUN and the moves' PP were cut at the buttons' ends), and the arrows reach the
   third and fourth moves.
+- **Black and White: trees at the top of the view are no longer drawn out to the widescreen
+  view's edge** (seen from a town's rooftop).
 - **60 FPS in-between frames: no flicker on pictures that step through an animation** (Black's
   water sparkles, windows that glint), taken from the original project's 2026-11-01 hotfix.
 - **Black and White's sunshine** (the lens flare when you step out into it) shines from the
