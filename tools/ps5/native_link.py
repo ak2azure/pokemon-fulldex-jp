@@ -86,6 +86,8 @@ def main():
     link = [os.path.join(sdk, "bin", "prospero-lld"),
             "-L", native, "-T", os.path.join(os.path.dirname(os.path.abspath(__file__)), "native", "ps5-pie-unwind.ld"),
             "--eh-frame-hdr", "--error-limit=0", "-z", "nodynamic-undefined-weak",
+            # (out.map: which function each address is in, for the crash reports in game.log.)
+            "--Map=" + out + ".map",
             "--version-script", os.path.join(native, "app-symbols.map"), "--exclude-libs=ALL",
             "-e", "_start", "-L", lib, "-o", pie, cfg["crt"], cfg["wraps"]]
     # Archives may need each other in any order (melonDS's core and the frontend's), so they go

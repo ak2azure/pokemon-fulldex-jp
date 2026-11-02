@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -194,6 +195,79 @@ inline bool FreeFromSandbox(const char* dir)
     }
     fprintf(stderr, "[ps5] jailbreak: still in the sandbox\n");
     return false;
+}
+
+// A crash written to the log (stderr) before the title closes: the signal, the address it
+// faulted on, where this function is (the program's base follows from it and the link map,
+// build-ps5-native-work/*.map), and the words above the handler's frame that point into the
+// program's code, which are the return addresses of the calls that led to the crash (the
+// handler runs on the same stack). write() only: nothing here allocates.
+namespace Detail
+{
+inline void Hex(char*& p, uint64_t v)
+{
+    *p++ = '0';
+    *p++ = 'x';
+    for (int s = 60; s >= 0; s -= 4) *p++ = "0123456789abcdef"[(v >> s) & 15];
+}
+
+inline void Put(const char* s)
+{
+    write(2, s, strlen(s));
+}
+
+inline void OnCrash(int sig, siginfo_t* info, void*)
+{
+    char line[160];
+    char* p = line;
+    const char* head = "\n[ps5] CRASH: signal ";
+    memcpy(p, head, strlen(head));
+    p += strlen(head);
+    *p++ = (char)('0' + sig / 10);
+    *p++ = (char)('0' + sig % 10);
+    const char* at = " at address ";
+    memcpy(p, at, strlen(at));
+    p += strlen(at);
+    Hex(p, (uint64_t)(uintptr_t)(info ? info->si_addr : nullptr));
+    const char* here = "; OnCrash is at ";
+    memcpy(p, here, strlen(here));
+    p += strlen(here);
+    Hex(p, (uint64_t)(uintptr_t)&OnCrash);
+    *p++ = '\n';
+    write(2, line, (size_t)(p - line));
+    Put("[ps5] return addresses near the program's code, innermost first:\n");
+    const uint64_t self = (uint64_t)(uintptr_t)&OnCrash;
+    uint64_t local = 0;
+    const uint64_t* sp = &local;
+    int shown = 0;
+    for (int i = 0; i < 4096 && shown < 48; i++)
+    {
+        const uint64_t v = sp[i];
+        if (v + 0x2000000 > self && v < self + 0x2000000)
+        {
+            p = line;
+            *p++ = ' ';
+            Hex(p, v);
+            *p++ = '\n';
+            write(2, line, (size_t)(p - line));
+            shown++;
+        }
+    }
+    Put("[ps5] end of the crash report\n");
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+}
+
+inline void LogCrashes()
+{
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = Detail::OnCrash;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    for (const int sig : { SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT }) sigaction(sig, &sa, nullptr);
+    fprintf(stderr, "[ps5] crashes are logged (OnCrash at %p)\n", (void*)&Detail::OnCrash);
 }
 
 // A notice for when there is no /data: written where a title can always write, its

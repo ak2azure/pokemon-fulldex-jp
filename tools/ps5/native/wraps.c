@@ -97,6 +97,40 @@ int __cxa_thread_atexit_impl(void (*destructor)(void *), void *object, void *dso
     return ps5___cxa_thread_atexit_impl(destructor, object, dso);
 }
 
+/* SDL's PS5 video driver opens the USB keyboard and the on-screen keyboard as it starts. The
+ * payload had both; a title is not known to be able to load their modules, and a call into
+ * one it has not loaded jumps to nothing (the first test title stopped inside SDL_Init). The
+ * program is played with the controller, so here there is no keyboard: SDL is told so and
+ * goes on without one. */
+int __wrap_sceKeyboardInit(void) { return (int)0x80000001; }
+int __wrap_sceKeyboardOpen(int user, int type, int index, void *param)
+{
+    (void)user, (void)type, (void)index, (void)param;
+    return (int)0x80000001;
+}
+int __wrap_sceKeyboardReadState(int handle, void *state)
+{
+    (void)handle, (void)state;
+    return (int)0x80000001;
+}
+int __wrap_sceKeyboardClose(int handle)
+{
+    (void)handle;
+    return 0;
+}
+int __wrap_sceImeDialogInit(const void *param, void *extended)
+{
+    (void)param, (void)extended;
+    return (int)0x80000001;
+}
+int __wrap_sceImeDialogGetStatus(void) { return 0; /* none */ }
+int __wrap_sceImeDialogGetResult(void *result)
+{
+    (void)result;
+    return (int)0x80000001;
+}
+int __wrap_sceImeDialogTerm(void) { return 0; }
+
 /* sysconf answers 16 processors where a title's threads run on 13 (the compositor and the
  * widescreen 3D size their thread pools by it). */
 long __wrap_sysconf(int name) { return ps5_sysconf(name); }

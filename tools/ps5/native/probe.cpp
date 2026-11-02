@@ -16,6 +16,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "../../../frontend/ps5_native.h"
@@ -66,6 +67,7 @@ int main(int, char**)
     const std::string log = std::string(data ? dir : Ps5Native::FallbackDir()) + "/native-probe.log";
     if (freopen(log.c_str(), "w", stderr)) setvbuf(stderr, nullptr, _IOLBF, 0);
     fprintf(stderr, "[probe] Pokemon Fulldex test title, pid %d, uid %d\n", (int)getpid(), (int)geteuid());
+    Ps5Native::LogCrashes();
     Note("out of the sandbox (/data written)", data);
 
     int roms = 0;
@@ -99,11 +101,22 @@ int main(int, char**)
     Note("code made and run (JIT)", Ps5Native::CanRunJit());
 
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
-    const bool sdl = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) == 0;
-    Note("SDL started", sdl);
-    if (!sdl)
+    // SDL's parts one at a time, each said before it starts: the first probe on the console
+    // stopped inside SDL_Init with all three at once.
+    bool sdl = true;
+    for (const auto& part : { std::make_pair(0u, "SDL itself"), std::make_pair((unsigned)SDL_INIT_VIDEO, "SDL video"),
+                              std::make_pair((unsigned)SDL_INIT_AUDIO, "SDL audio"),
+                              std::make_pair((unsigned)SDL_INIT_GAMECONTROLLER, "SDL controllers") })
     {
-        fprintf(stderr, "[probe] SDL_Init: %s\n", SDL_GetError());
+        fprintf(stderr, "[probe] starting %s\n", part.second);
+        fflush(stderr);
+        const bool ok = (part.first ? SDL_InitSubSystem(part.first) : SDL_Init(0)) == 0;
+        if (!ok) fprintf(stderr, "[probe] %s: %s\n", part.second, SDL_GetError());
+        Note(part.second, ok);
+        if (part.first <= SDL_INIT_VIDEO) sdl = sdl && ok;
+    }
+    if (!sdl) // (without SDL's video there is nothing to show; the log says why)
+    {
         sceSystemServiceHideSplashScreen();
         sceSystemServiceLoadExec("exit", nullptr);
         return 1;

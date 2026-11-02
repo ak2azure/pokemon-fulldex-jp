@@ -106,7 +106,7 @@ say "The title's start-up code and its links to the platform layer"
     -c tools/ps5/native/wraps.c -o "$WORK/wraps.o"
 # The names linked with --wrap: wraps.c's, and the platform layer's own (the heap, and threads
 # with the main thread's 2 MiB stack instead of a title's 64 KiB).
-WRAPS="$(grep -o '__wrap_[a-z_0-9]*' tools/ps5/native/wraps.c | sed 's/__wrap_//' | sort -u | tr '\n' ' ')"
+WRAPS="$(grep -o '__wrap_[A-Za-z_0-9]*' tools/ps5/native/wraps.c | sed 's/__wrap_//' | sort -u | tr '\n' ' ')"
 WRAPS+="malloc calloc realloc free posix_memalign aligned_alloc memalign malloc_usable_size reallocf "
 WRAPS+="reallocarray getline getdelim pthread_create pthread_join pthread_detach"
 python3 - "$WORK/link.json" "$WRAPS" <<EOF
@@ -154,6 +154,7 @@ say "Compiling the program for the PS5, as a title"
 )
 title "$DIST/$TITLE_ID" "$TITLE_ID" "Pokémon Fulldex Native" build-ps5-native/pokemon-fulldex.elf
 cp build-ps5-native/pokemon-fulldex.elf.imports "$WORK/imports.txt"
+cp build-ps5-native/pokemon-fulldex.elf.map "$WORK/pokemon-fulldex.map"
 
 say "Notices"
 mkdir -p "$DIST/licenses"

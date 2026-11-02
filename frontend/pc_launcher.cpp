@@ -1568,6 +1568,7 @@ bool Start(int& argc, char**& argv)
     }
     fprintf(stderr, "[ps5] the title (eboot.bin), pid %d, uid %d; /data %s\n", (int)getpid(), (int)geteuid(),
         freed ? "reached" : "NOT reached");
+    Ps5Native::LogCrashes();
 #endif
     fprintf(stderr, "[launcher] folder %s\n", fo.dir.c_str());
 #ifdef SSR_PS5
