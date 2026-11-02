@@ -19,6 +19,9 @@ namespace VkRender
 // Vulkan started with the screen (the PS5: RADV, the display at its largest mode near 60 Hz),
 // or without one (w x h, for tests). False (and why, in info) if it could not be.
 bool Start(std::string& info, bool screen, int w = 0, int h = 0);
+// Whether it started: SDL's renderer functions then come here (on the PS5 title; otherwise to
+// SDL's own renderer, which draws with the processor).
+bool Active();
 
 SDL_Renderer* CreateRenderer(SDL_Window* window, int index, Uint32 flags);
 void DestroyRenderer(SDL_Renderer* r);

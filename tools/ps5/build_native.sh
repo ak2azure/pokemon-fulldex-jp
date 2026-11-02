@@ -97,6 +97,11 @@ clang-18 "${PCF[@]}" -w -c "$PF/platform/src/dlmalloc/mspace.c" -o "$WORK/platfo
 rm -f "$WORK/libps5platform.a"
 llvm-ar-18 rcs "$WORK/libps5platform.a" "$WORK"/platform/*.o
 
+say "RADV (tools/ps5/build_radv.sh)"
+bash tools/ps5/build_radv.sh
+RADV_A=build-ps5-radv/radv/lib/libvulkan_radeon.ps5.a
+RADV_INC=build-ps5-radv/radv/include
+
 say "The title's start-up code and its links to the platform layer"
 "$PS5_PAYLOAD_SDK/bin/prospero-clang++" -std=c++20 -O2 -fno-exceptions -fno-rtti \
     -c "$BP/tooling/native/app_crt.cpp" -o "$WORK/app_crt.o"
@@ -107,12 +112,35 @@ say "The title's start-up code and its links to the platform layer"
 WRAPS="$(grep -o '__wrap_[A-Za-z_0-9]*' tools/ps5/native/wraps.c | sed 's/__wrap_//' | sort -u | tr '\n' ' ')"
 WRAPS+="malloc calloc realloc free posix_memalign aligned_alloc memalign malloc_usable_size reallocf "
 WRAPS+="reallocarray getline getdelim pthread_create pthread_join pthread_detach"
-python3 - "$WORK/link.json" "$WRAPS" <<EOF
+# The program's link has RADV in it too (link.json; the test title's, link-plain.json, has not):
+# its archive whole, Clang's builtins (__emutls_get_address and the like for its C++), libc's
+# FILE published through fclose and fflush (open_memstream, which Mesa uses), the libc names
+# RADV uses that no module a title loads gives, bound to the platform layer's ps5_ functions
+# (PS5_Vulkan's tools/radv-link.sh lists them), and SDL's renderer functions, which go to
+# frontend/vkrender.cpp.
+BUILTINS="$(clang-18 --print-resource-dir)/lib/linux/libclang_rt.builtins-x86_64.a"
+DEFSYMS="qsort_r mkstemps openlog popen pclose open_memstream __xuname __assert __memset_chk regcomp regexec regfree"
+DEFSYMS+=" regerror newlocale freelocale strtod_l strtof_l dladdr utimensat localeconv_l strtoll_l strtoull_l"
+DEFSYMS+=" strtold_l snprintf_l sscanf_l asprintf_l strcoll_l strxfrm_l strftime_l wcscoll_l wcsxfrm_l btowc_l"
+DEFSYMS+=" wctob_l iswctype_l mbrlen_l mbrtowc_l mbsrtowcs_l mbsnrtowcs_l wcrtomb_l wcsnrtombs_l mbtowc_l"
+DEFSYMS+=" ___mb_cur_max_l ___runetype_l ___tolower_l ___toupper_l __runes_for_locale catopen catgets catclose"
+DEFSYMS+=" backtrace backtrace_symbols_fd localeconv arc4random_uniform fstatvfs futimens if_nameindex"
+DEFSYMS+=" if_freenameindex nl_langinfo nl_langinfo_l getpwuid_r posix_fallocate access memfd_create readlink link symlink"
+SDLWRAPS="SDL_CreateRenderer SDL_DestroyRenderer SDL_GetRendererInfo SDL_GetRendererOutputSize SDL_CreateTexture"
+SDLWRAPS+=" SDL_DestroyTexture SDL_UpdateTexture SDL_SetTextureBlendMode SDL_SetTextureScaleMode SDL_SetTextureColorMod"
+SDLWRAPS+=" SDL_SetTextureAlphaMod SDL_SetRenderDrawColor SDL_SetRenderDrawBlendMode SDL_RenderClear SDL_RenderFillRect"
+SDLWRAPS+=" SDL_RenderFillRects SDL_RenderCopy SDL_RenderCopyF SDL_RenderCopyEx SDL_RenderGeometry SDL_RenderReadPixels"
+SDLWRAPS+=" SDL_RenderPresent"
+python3 - "$WORK" "$WRAPS" "$DEFSYMS" "$SDLWRAPS" "$HERE/$RADV_A" "$BUILTINS" <<EOF
 import json, sys
-json.dump({"sdk": "$PS5_PAYLOAD_SDK", "boilerplate": "$HERE/$BP", "tool": "$TOOL",
-           "platform": "$HERE/$WORK/libps5platform.a", "crt": "$HERE/$WORK/app_crt.o",
-           "wraps": "$HERE/$WORK/wraps.o", "wraps_names": sys.argv[2].split()},
-          open(sys.argv[1], "w"), indent=1)
+work, wraps, defsyms, sdl, radv, builtins = sys.argv[1:7]
+plain = {"sdk": "$PS5_PAYLOAD_SDK", "boilerplate": "$HERE/$BP", "tool": "$TOOL",
+         "platform": "$HERE/$WORK/libps5platform.a", "crt": "$HERE/$WORK/app_crt.o",
+         "wraps": "$HERE/$WORK/wraps.o", "wraps_names": wraps.split()}
+json.dump(plain, open(work + "/link-plain.json", "w"), indent=1)
+full = dict(plain, whole=[radv], builtins=builtins, defsyms=defsyms.split(),
+            wraps_names=wraps.split() + ["fclose", "fflush"] + sdl.split())
+json.dump(full, open(work + "/link.json", "w"), indent=1)
 EOF
 
 title() { # dir title-id name eboot.elf
@@ -142,7 +170,7 @@ if [ -n "${PS5_PROBE:-}" ]; then
     say "The test title (tools/ps5/native/probe.cpp)"
     "$PS5_PAYLOAD_SDK/bin/prospero-clang++" -std=c++17 -O2 -DSSR_PS5_NATIVE \
         -I"$PS5_PAYLOAD_SDK/target/user/homebrew/include/SDL2" -c tools/ps5/native/probe.cpp -o "$WORK/probe.o"
-    python3 tools/ps5/native_link.py --config "$WORK/link.json" --out "$WORK/probe.elf" "$WORK/probe.o" \
+    python3 tools/ps5/native_link.py --config "$WORK/link-plain.json" --out "$WORK/probe.elf" "$WORK/probe.o" \
         "$PS5_PAYLOAD_SDK/target/user/homebrew/lib/libSDL2.a" "$PS5_PAYLOAD_SDK/target/user/homebrew/lib/libiconv.a"
     rm -rf "$WORK/$PROBE_ID"
     title "$WORK/$PROBE_ID" "$PROBE_ID" "Fulldex Test" "$WORK/probe.elf"
@@ -153,7 +181,8 @@ say "Compiling the program for the PS5, as a title"
     source "$PS5_PAYLOAD_SDK/toolchain/prospero.sh"
     "$CMAKE" -S . -B build-ps5-native -G Ninja -DCMAKE_BUILD_TYPE=Release -DSSR_JIT=ON -DSSR_PC_ALL_GAMES=ON \
         -DSSR_PNG=OFF -DSSR_GPU3D=OFF -DSSR_PORTABLE_X86=ON -DSSR_GENERATED_DIR="$HERE/build-gen-tables" \
-        -DSSR_PS5_NATIVE=ON -DSSR_PS5_NATIVE_LINK="$HERE/$WORK/link.json" -DCMAKE_VERBOSE_MAKEFILE=OFF >/dev/null
+        -DSSR_PS5_NATIVE=ON -DSSR_PS5_NATIVE_LINK="$HERE/$WORK/link.json" -DSSR_WIDE_VK=ON -DSSR_VK_RENDER=ON \
+        -DSSR_VULKAN_INCLUDE="$HERE/$RADV_INC" -DCMAKE_VERBOSE_MAKEFILE=OFF >/dev/null
     ninja -C build-ps5-native ssrecomp
 )
 title "$DIST/$TITLE_ID" "$TITLE_ID" "Pokémon Fulldex Native" build-ps5-native/pokemon-fulldex.elf
@@ -179,7 +208,11 @@ https://github.com/ak2azure/pokemon-fulldex-jp (tools/ps5/build_native.sh builds
   dlmalloc (MIT) in it.
 - How the title asks the jailbreak to free it, from Porpoise (GPL-3.0-or-later, elripalda):
   https://github.com/elripalda/Porpoise-Dolphin-Emulator-for-PS5 (src/porpoise_jailbreak.cpp).
+- RADV, Mesa's Vulkan driver (MIT; Mesa's licence in Mesa-license.rst), from Mihawk's Mesa fork
+  with its PS5 winsys, https://github.com/mihawk-99/PS5_Mesa, built as PS5_Vulkan
+  (GPL-3.0-or-later, https://github.com/mihawk-99/PS5_Vulkan) builds it (tools/ps5/build_radv.sh).
 EOF
+[ -f build-ps5-radv/radv/MESA-LICENSE.rst ] && cp build-ps5-radv/radv/MESA-LICENSE.rst "$DIST/licenses/Mesa-license.txt"
 cp tools/ps5/README-native.txt "$DIST/README.txt"
 
 # Only the titles, the tables, the notes and the empty folders: never a ROM, save or game code.

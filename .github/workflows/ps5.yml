@@ -31,10 +31,19 @@ jobs:
       - name: Prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends git cmake ninja-build python3 clang-18 lld-18 llvm-18 make wget unzip zlib1g-dev
+          sudo apt-get install -y --no-install-recommends git cmake ninja-build python3 clang-18 lld-18 llvm-18 make wget unzip zlib1g-dev \
+            rsync python3-pip python3-mako python3-yaml python3-packaging llvm-18-dev libclang-18-dev libclc-18-dev \
+            llvm-spirv-18 libllvmspirvlib-18-dev bison flex glslang-tools
+          # (Mesa wants a newer meson than Ubuntu's, for RADV: tools/ps5/build_radv.sh.)
+          sudo pip3 install --break-system-packages 'meson>=1.4'
           curl -fsSL -o /tmp/ps5-payload-dev.tar.gz \
             https://github.com/ps5-payload-dev/pacbrew-repo/releases/latest/download/ps5-payload-dev.tar.gz
           sudo tar -xzf /tmp/ps5-payload-dev.tar.gz -C /
+      # RADV takes a while to build: kept from run to run while its pins stay the same.
+      - uses: actions/cache@v4
+        with:
+          path: build-ps5-radv/radv
+          key: radv-${{ hashFiles('tools/ps5/build_radv.sh') }}
       - name: Build
         run: bash tools/ps5/build_native.sh
       - uses: actions/upload-artifact@v4

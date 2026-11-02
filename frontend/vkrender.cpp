@@ -573,6 +573,8 @@ int CopyTo(SDL_Texture* texture, const SDL_Rect* src, float x0, float y0, float 
 }
 }
 
+bool Active() { return S.Started; }
+
 bool Start(std::string& info, bool screen, int w, int h)
 {
     if (S.Started) return true;
@@ -868,37 +870,41 @@ void RenderPresent(SDL_Renderer*)
 }
 }
 
+
 #ifdef SSR_PS5_NATIVE
-// The title's link sends SDL's renderer functions here (--wrap; tools/ps5/build_native.sh).
-extern "C" {
-SDL_Renderer* __wrap_SDL_CreateRenderer(SDL_Window* w, int i, Uint32 f) { return VkRender::CreateRenderer(w, i, f); }
-void __wrap_SDL_DestroyRenderer(SDL_Renderer* r) { VkRender::DestroyRenderer(r); }
-int __wrap_SDL_GetRendererInfo(SDL_Renderer* r, SDL_RendererInfo* i) { return VkRender::GetRendererInfo(r, i); }
-int __wrap_SDL_GetRendererOutputSize(SDL_Renderer* r, int* w, int* h) { return VkRender::GetRendererOutputSize(r, w, h); }
-SDL_Texture* __wrap_SDL_CreateTexture(SDL_Renderer* r, Uint32 f, int a, int w, int h) { return VkRender::CreateTexture(r, f, a, w, h); }
-void __wrap_SDL_DestroyTexture(SDL_Texture* t) { VkRender::DestroyTexture(t); }
-int __wrap_SDL_UpdateTexture(SDL_Texture* t, const SDL_Rect* r, const void* p, int pitch) { return VkRender::UpdateTexture(t, r, p, pitch); }
-int __wrap_SDL_SetTextureBlendMode(SDL_Texture* t, SDL_BlendMode m) { return VkRender::SetTextureBlendMode(t, m); }
-int __wrap_SDL_SetTextureScaleMode(SDL_Texture* t, SDL_ScaleMode m) { return VkRender::SetTextureScaleMode(t, m); }
-int __wrap_SDL_SetTextureColorMod(SDL_Texture* t, Uint8 r, Uint8 g, Uint8 b) { return VkRender::SetTextureColorMod(t, r, g, b); }
-int __wrap_SDL_SetTextureAlphaMod(SDL_Texture* t, Uint8 a) { return VkRender::SetTextureAlphaMod(t, a); }
-int __wrap_SDL_SetRenderDrawColor(SDL_Renderer* r, Uint8 a, Uint8 b, Uint8 c, Uint8 d) { return VkRender::SetRenderDrawColor(r, a, b, c, d); }
-int __wrap_SDL_SetRenderDrawBlendMode(SDL_Renderer* r, SDL_BlendMode m) { return VkRender::SetRenderDrawBlendMode(r, m); }
-int __wrap_SDL_RenderClear(SDL_Renderer* r) { return VkRender::RenderClear(r); }
-int __wrap_SDL_RenderFillRect(SDL_Renderer* r, const SDL_Rect* rect) { return VkRender::RenderFillRect(r, rect); }
-int __wrap_SDL_RenderFillRects(SDL_Renderer* r, const SDL_Rect* rects, int n) { return VkRender::RenderFillRects(r, rects, n); }
-int __wrap_SDL_RenderCopy(SDL_Renderer* r, SDL_Texture* t, const SDL_Rect* s, const SDL_Rect* d) { return VkRender::RenderCopy(r, t, s, d); }
-int __wrap_SDL_RenderCopyF(SDL_Renderer* r, SDL_Texture* t, const SDL_Rect* s, const SDL_FRect* d) { return VkRender::RenderCopyF(r, t, s, d); }
-int __wrap_SDL_RenderCopyEx(SDL_Renderer* r, SDL_Texture* t, const SDL_Rect* s, const SDL_Rect* d, double a, const SDL_Point* c,
-    SDL_RendererFlip f) { return VkRender::RenderCopyEx(r, t, s, d, a, c, f); }
-int __wrap_SDL_RenderGeometry(SDL_Renderer* r, SDL_Texture* t, const SDL_Vertex* v, int n, const int* i, int ni)
-{
-    return VkRender::RenderGeometry(r, t, v, n, i, ni);
-}
-int __wrap_SDL_RenderReadPixels(SDL_Renderer* r, const SDL_Rect* rect, Uint32 f, void* p, int pitch)
-{
-    return VkRender::RenderReadPixels(r, rect, f, p, pitch);
-}
-void __wrap_SDL_RenderPresent(SDL_Renderer* r) { VkRender::RenderPresent(r); }
-}
+// The title's link sends SDL's renderer functions here (--wrap; tools/ps5/build_native.sh): to
+// Vulkan when it started (VkRender::Active), otherwise to SDL's own renderer, which then draws
+// with the processor on SDL's PS5 video driver, as before.
+#define SSR_VKR_WRAP(ret, name, params, args) \
+    extern "C" ret __real_SDL_##name params; \
+    extern "C" ret __wrap_SDL_##name params \
+    { \
+        if (VkRender::Active()) return VkRender::name args; \
+        return __real_SDL_##name args; \
+    }
+SSR_VKR_WRAP(SDL_Renderer*, CreateRenderer, (SDL_Window* w, int i, Uint32 f), (w, i, f))
+SSR_VKR_WRAP(void, DestroyRenderer, (SDL_Renderer* r), (r))
+SSR_VKR_WRAP(int, GetRendererInfo, (SDL_Renderer* r, SDL_RendererInfo* i), (r, i))
+SSR_VKR_WRAP(int, GetRendererOutputSize, (SDL_Renderer* r, int* w, int* h), (r, w, h))
+SSR_VKR_WRAP(SDL_Texture*, CreateTexture, (SDL_Renderer* r, Uint32 f, int a, int w, int h), (r, f, a, w, h))
+SSR_VKR_WRAP(void, DestroyTexture, (SDL_Texture* t), (t))
+SSR_VKR_WRAP(int, UpdateTexture, (SDL_Texture* t, const SDL_Rect* r, const void* p, int pitch), (t, r, p, pitch))
+SSR_VKR_WRAP(int, SetTextureBlendMode, (SDL_Texture* t, SDL_BlendMode m), (t, m))
+SSR_VKR_WRAP(int, SetTextureScaleMode, (SDL_Texture* t, SDL_ScaleMode m), (t, m))
+SSR_VKR_WRAP(int, SetTextureColorMod, (SDL_Texture* t, Uint8 r, Uint8 g, Uint8 b), (t, r, g, b))
+SSR_VKR_WRAP(int, SetTextureAlphaMod, (SDL_Texture* t, Uint8 a), (t, a))
+SSR_VKR_WRAP(int, SetRenderDrawColor, (SDL_Renderer* r, Uint8 a, Uint8 b, Uint8 c, Uint8 d), (r, a, b, c, d))
+SSR_VKR_WRAP(int, SetRenderDrawBlendMode, (SDL_Renderer* r, SDL_BlendMode m), (r, m))
+SSR_VKR_WRAP(int, RenderClear, (SDL_Renderer* r), (r))
+SSR_VKR_WRAP(int, RenderFillRect, (SDL_Renderer* r, const SDL_Rect* rect), (r, rect))
+SSR_VKR_WRAP(int, RenderFillRects, (SDL_Renderer* r, const SDL_Rect* rects, int n), (r, rects, n))
+SSR_VKR_WRAP(int, RenderCopy, (SDL_Renderer* r, SDL_Texture* t, const SDL_Rect* s, const SDL_Rect* d), (r, t, s, d))
+SSR_VKR_WRAP(int, RenderCopyF, (SDL_Renderer* r, SDL_Texture* t, const SDL_Rect* s, const SDL_FRect* d), (r, t, s, d))
+SSR_VKR_WRAP(int, RenderCopyEx, (SDL_Renderer* r, SDL_Texture* t, const SDL_Rect* s, const SDL_Rect* d, double a,
+    const SDL_Point* c, SDL_RendererFlip f), (r, t, s, d, a, c, f))
+SSR_VKR_WRAP(int, RenderGeometry, (SDL_Renderer* r, SDL_Texture* t, const SDL_Vertex* v, int n, const int* i, int ni),
+    (r, t, v, n, i, ni))
+SSR_VKR_WRAP(int, RenderReadPixels, (SDL_Renderer* r, const SDL_Rect* rect, Uint32 f, void* p, int pitch), (r, rect, f, p, pitch))
+SSR_VKR_WRAP(void, RenderPresent, (SDL_Renderer* r), (r))
+#undef SSR_VKR_WRAP
 #endif

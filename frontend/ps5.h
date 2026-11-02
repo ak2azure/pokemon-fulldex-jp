@@ -20,6 +20,9 @@
 #include <unistd.h>
 
 #include "ps5_native.h"
+#ifdef SSR_VK_RENDER
+#include "vkrender.h"
+#endif
 
 extern "C" {
 // (As ps5-payload-sdk's samples declare them: libkernel and libSceSystemService.)
@@ -247,6 +250,33 @@ inline bool CanRunJit()
     return true;
 }
 
+// The title's picture by the graphics chip (SSR_VK_RENDER): Vulkan on RADV, at the screen's own
+// size (frontend/vkrender.cpp), started before SDL so that SDL's video is then its "dummy" one,
+// which leaves the console's video output to Vulkan. If Vulkan cannot start, SDL's PS5 video
+// driver and its software renderer draw the picture with the processor, as before. Once.
+inline void StartPicture()
+{
+#ifdef SSR_VK_RENDER
+    static bool tried = false;
+    if (tried) return;
+    tried = true;
+    // (RADV keeps the shaders it has compiled on disk, for a quicker start the next time: in the
+    // player's folder, which a title can write once it is out of the sandbox.)
+    mkdir("/data/pokemon-ds-wide/cache", 0777);
+    setenv("MESA_SHADER_CACHE_DIR", "/data/pokemon-ds-wide/cache", 0);
+    std::string info;
+    if (VkRender::Start(info, true))
+    {
+        setenv("SDL_VIDEODRIVER", "dummy", 1);
+        int w = 0, h = 0;
+        VkRender::GetRendererOutputSize(nullptr, &w, &h);
+        fprintf(stderr, "[ps5] the picture: Vulkan on %s, %dx%d\n", info.c_str(), w, h);
+    }
+    else
+        Notify("Pokemon Fulldex: graphics chip not available (%s): the processor draws", info.c_str());
+#endif
+}
+
 // Before the software renderer: the window's picture, which opens the PS5's video output.
 // SDL replaces the reason it fails with "Couldn't find matching render driver", so it is
 // asked for here first and the real reason shown, then let go again: SDL makes no renderer
@@ -255,6 +285,9 @@ inline bool CanRunJit()
 // renderer, and trying for one only hides that error too.
 inline bool PrepareWindow(SDL_Window* window)
 {
+#ifdef SSR_VK_RENDER
+    if (VkRender::Active()) return true; // (Vulkan shows the picture; SDL's window has none)
+#endif
     SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "0");
     if (SDL_GetWindowSurface(window))
     {

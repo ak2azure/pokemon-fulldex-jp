@@ -403,6 +403,8 @@ int PickGame(Folders& fo, std::vector<Launcher::Game>& games, int selected, bool
     // Mesa, is drawn by the processor too, more slowly.)
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
     fullscreen = true;
+    // (The title: Vulkan draws the list when it can, frontend/ps5.h.)
+    Ps5::StartPicture();
 #endif
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0)
     {

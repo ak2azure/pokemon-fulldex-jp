@@ -61,8 +61,8 @@
 #include "pc_launcher.h"
 
 // WORLD ON GPU, the widescreen world drawn by the graphics chip (melonDS/src/GPU3D_WideGpu.h):
-// deko3D on the Switch, OpenGL on a PC (EGL on Linux, WGL on Windows).
-#if defined(SSR_DEKO3D) || (defined(SSR_GPU3D) && !defined(__SWITCH__))
+// deko3D on the Switch, OpenGL on a PC (EGL on Linux, WGL on Windows), Vulkan on the PS5 title.
+#if defined(SSR_DEKO3D) || (defined(SSR_GPU3D) && !defined(__SWITCH__)) || defined(SSR_WIDE_VK)
 #define SSR_WORLD_ON_GPU 1
 #else
 #define SSR_WORLD_ON_GPU 0
@@ -1494,6 +1494,8 @@ struct Settings
         f << "gpu3d_test=" << (gpu3d ? 1 : 0) << "\n";
         f << "wide_gpu=" << (wideGpu ? 1 : 0) << "\n";
         f << "ds3d_gpu=" << (ds3dGpu ? 1 : 0) << "\n";
+#elif defined(SSR_WIDE_VK)
+        f << "wide_gpu=" << (wideGpu ? 1 : 0) << "\n";
 #endif
 #ifdef __SWITCH__
         f << "cpu_boost=" << (cpuBoost ? 1 : 0) << "\n";
@@ -1996,6 +1998,9 @@ int main(int argc, char** argv)
         SDL_SetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON, "1");
         SDL_SetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL, "1");
         #endif
+#ifdef SSR_PS5
+        Ps5::StartPicture(); // (the title's picture by Vulkan when it can: frontend/ps5.h)
+#endif
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
         {
             fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());

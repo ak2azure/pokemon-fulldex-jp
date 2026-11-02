@@ -4,8 +4,10 @@
 
 - **PS5: a test version that is a title of its own** (PKFD00002, "Pokémon Fulldex Native"): it
   starts straight from its Home screen tile like any game, with no ELF loader or websrv, and the
-  PS button goes to the Home screen and back. It asks etaHEN for /data as it starts. For now its
-  picture is drawn by the processor (1920x1080); the games run on the JIT.
+  PS button goes to the Home screen and back. It asks etaHEN for /data as it starts. The games run
+  on the JIT, and the picture is drawn by the graphics chip at the screen's own resolution (4K on
+  a 4K TV), with WORLD ON GPU, through Vulkan; if that cannot start, the processor draws it at
+  1920x1080.
 - **LAN PLAY** (pause menu): the DS's local wireless with another program on the same network,
   for trades, battles and the Union Room: another copy of this one or melonDS 1.1 itself (its
   own LAN play). One hosts (HOST), the others join it (JOIN shows the hosts found; or melonDS's

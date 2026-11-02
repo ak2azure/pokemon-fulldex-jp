@@ -349,6 +349,26 @@ else()
             target_compile_definitions(core PRIVATE SSR_PS5_NATIVE)
             set_target_properties(ssrecomp PROPERTIES RULE_LAUNCH_LINK
                 "python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/ps5/native_link.py --config ${SSR_PS5_NATIVE_LINK} --")
+            # The picture by the graphics chip: SDL's renderer done with Vulkan on RADV
+            # (frontend/vkrender.cpp), on the device of WORLD ON GPU (SSR_WIDE_VK).
+            option(SSR_VK_RENDER "The PS5 title's picture drawn with Vulkan" OFF)
+            if(SSR_VK_RENDER)
+                if(NOT SSR_WIDE_VK)
+                    message(FATAL_ERROR "SSR_VK_RENDER needs SSR_WIDE_VK")
+                endif()
+                find_package(Python3 REQUIRED COMPONENTS Interpreter)
+                set(_vk_render_spv "${CMAKE_CURRENT_BINARY_DIR}/vk_render")
+                file(MAKE_DIRECTORY "${_vk_render_spv}")
+                add_custom_command(OUTPUT "${_vk_render_spv}/render_spv.h"
+                    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/vk_shaders.py" "${SSR_GLSLANG}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/frontend/vk" "${_vk_render_spv}/render_spv.h" render
+                    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/frontend/vk/render_vsh.glsl"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/frontend/vk/render_fsh.glsl" "${CMAKE_CURRENT_SOURCE_DIR}/tools/vk_shaders.py"
+                    VERBATIM)
+                target_sources(ssrecomp PRIVATE frontend/vkrender.cpp "${_vk_render_spv}/render_spv.h")
+                target_include_directories(ssrecomp PRIVATE "${_vk_render_spv}")
+                target_compile_definitions(ssrecomp PRIVATE SSR_VK_RENDER)
+            endif()
         endif()
     elseif(UNIX AND NOT APPLE AND SSR_PC_ALL_GAMES)
         # The Linux download carries its own SDL2 beside the program (tools/pc/build_all.sh),
