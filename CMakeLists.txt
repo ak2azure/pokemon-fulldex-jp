@@ -115,6 +115,11 @@ add_library(enet STATIC
 target_include_directories(enet PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/frontend/thirdparty/enet/include")
 if(WIN32)
     target_link_libraries(enet PUBLIC ws2_32 winmm)
+else()
+    # (What ENet's own build finds out about the system, given: every system here has these. Not
+    # poll: select is enough for the few sockets, and the same on all of them.)
+    target_compile_definitions(enet PRIVATE HAS_SOCKLEN_T=1 HAS_FCNTL=1 HAS_GETADDRINFO=1 HAS_GETNAMEINFO=1
+        HAS_INET_PTON=1 HAS_INET_NTOP=1 HAS_MSGHDR_FLAGS=1)
 endif()
 
 set(SSRECOMP_SOURCES
