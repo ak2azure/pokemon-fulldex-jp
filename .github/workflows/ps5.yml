@@ -1,4 +1,4 @@
-name: PS5 payload
+name: PS5
 on:
   workflow_dispatch:
 permissions:
@@ -22,3 +22,22 @@ jobs:
         with:
           name: pokemon-fulldex-ps5
           path: build-ps5-dist/pokemon-fulldex-ps5.zip
+  # The program as a title of its own (eboot.bin, started from its Home screen tile): the
+  # folders PKFD00002 (the program), PKFD00099 (a test title) and pokemon-ds-wide, not zipped.
+  ps5-native:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends git cmake ninja-build python3 clang-18 lld-18 llvm-18 make wget unzip zlib1g-dev
+          curl -fsSL -o /tmp/ps5-payload-dev.tar.gz \
+            https://github.com/ps5-payload-dev/pacbrew-repo/releases/latest/download/ps5-payload-dev.tar.gz
+          sudo tar -xzf /tmp/ps5-payload-dev.tar.gz -C /
+      - name: Build
+        run: bash tools/ps5/build_native.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pokemon-fulldex-ps5-native
+          path: build-ps5-native-dist/

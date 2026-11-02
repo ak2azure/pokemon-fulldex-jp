@@ -97,6 +97,11 @@ python3 tools/bw1/funcmap.py build-decomp-aletheia/layout/function_addrs.tsv - "
 python3 tools/bw1/funcmap.py build-decomp-aletheia/layout/function_addrs.tsv - "$FUNCS/IRAJ.txt" --jp-white
 python3 tools/bw2/funcmap.py build-decomp-pokebw2/config/b2_us/arm9 - "$FUNCS/IREJ.txt" --jp-black2
 cp tools/platinum/CPUE.txt tools/platinum/CPUJ.txt "$FUNCS/"
+# (PS5_TABLES_ONLY: only the tables, for the title's build, tools/ps5/build_native.sh.)
+if [ -n "${PS5_TABLES_ONLY:-}" ]; then
+    cp LICENSE "$OUT/LICENSE.txt"
+    exit 0
+fi
 
 say "SDL with its OpenGL ES 2 renderer"
 # (pacbrew's SDL2 package, ps5-payload-dev's SDL with its Mesa patch, and one line more: the

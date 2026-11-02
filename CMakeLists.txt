@@ -337,6 +337,19 @@ else()
         set_target_properties(ssrecomp PROPERTIES OUTPUT_NAME pokemon-fulldex SUFFIX .elf)
         # (sceSystemServiceLoadExec, which closes the homebrew application at the end: frontend/ps5.h.)
         target_link_libraries(ssrecomp PRIVATE SceSystemService)
+        # The PS5 title (SSR_PS5_NATIVE): eboot.bin is the program, started from its Home screen
+        # tile. The objects are the same; the link is a title's (tools/ps5/native_link.py, given
+        # CMake's link command), with the settings tools/ps5/build.sh wrote to
+        # SSR_PS5_NATIVE_LINK. melonDS's JIT then takes its code memory from direct memory
+        # (ARMJIT_Global.cpp).
+        option(SSR_PS5_NATIVE "Build the PS5 program as a title of its own (tools/ps5/build.sh native)" OFF)
+        if(SSR_PS5_NATIVE)
+            set(SSR_PS5_NATIVE_LINK "" CACHE FILEPATH "tools/ps5/native_link.py's settings")
+            target_compile_definitions(ssrecomp PRIVATE SSR_PS5_NATIVE)
+            target_compile_definitions(core PRIVATE SSR_PS5_NATIVE)
+            set_target_properties(ssrecomp PROPERTIES RULE_LAUNCH_LINK
+                "python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/ps5/native_link.py --config ${SSR_PS5_NATIVE_LINK} --")
+        endif()
     elseif(UNIX AND NOT APPLE AND SSR_PC_ALL_GAMES)
         # The Linux download carries its own SDL2 beside the program (tools/pc/build_all.sh),
         # found there first: $ORIGIN, the program's folder.

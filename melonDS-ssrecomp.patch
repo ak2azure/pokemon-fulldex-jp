@@ -444,21 +444,27 @@ index beaec00..b7a16c5 100644
  .section .note.GNU-stack,"",@progbits
  #endif
 diff --git a/src/ARMJIT_Global.cpp b/src/ARMJIT_Global.cpp
-index e4aa42f..dac46f0 100644
+index e4aa42f..4bb817e 100644
 --- a/src/ARMJIT_Global.cpp
 +++ b/src/ARMJIT_Global.cpp
-@@ -1,7 +1,9 @@
+@@ -1,7 +1,15 @@
  #include "ARMJIT_Global.h"
  #include "ARMJIT_Memory.h"
  
 -#ifdef _WIN32
 +#if defined(__SWITCH__)
 +// ssrecomp: on the Switch the ARM64 compiler makes its own code memory (ARMJIT_Compiler.cpp).
++#elif defined(__PROSPERO__) && defined(SSR_PS5_NATIVE)
++// ssrecomp: the PS5 title (frontend/ps5_native.h). A title cannot make its own memory
++// executable (mprotect with PROT_EXEC is refused), but direct memory mapped read-write can be
++// given execute afterwards: the platform layer of Mihawk's payload SDK fork does that, within
++// reach of the program's code, which the compiled code calls with 32-bit displacements.
++extern "C" void* ps5_exec_allocate(size_t bytes, uintptr_t anchor);
 +#elif defined(_WIN32)
  #include <windows.h>
  #else
  #include <sys/mman.h>
-@@ -25,7 +27,7 @@ std::mutex globalMutex;
+@@ -25,20 +33,31 @@ std::mutex globalMutex;
  #define APPLE_AARCH64
  #endif
  
@@ -467,27 +473,64 @@ index e4aa42f..dac46f0 100644
  static constexpr size_t NumCodeMemSlices = 4;
  static constexpr size_t CodeMemoryAlignedSize = NumCodeMemSlices * CodeMemorySliceSize;
  
-@@ -46,7 +48,7 @@ void* AllocateCodeMem()
++u32 AvailableCodeMemSlices = (1 << NumCodeMemSlices) - 1;
++
++#if defined(__PROSPERO__) && defined(SSR_PS5_NATIVE)
++// (ssrecomp: the slices in one region of direct memory, asked for the first time the JIT
++// starts: not 128 MB of the title's program memory, which is far smaller than direct memory.)
++u8* CodeMemory = nullptr;
++
++u8* GetAlignedCodeMemoryStart()
++{
++    return CodeMemory;
++}
++#else
+ // I haven't heard of pages larger than 16 KB
+ u8 CodeMemory[CodeMemoryAlignedSize + 16*1024];
+ 
+-u32 AvailableCodeMemSlices = (1 << NumCodeMemSlices) - 1;
+-
+ u8* GetAlignedCodeMemoryStart()
+ {
+     return reinterpret_cast<u8*>((reinterpret_cast<intptr_t>(CodeMemory) + (16*1024-1)) & ~static_cast<intptr_t>(16*1024-1));
+ }
+ #endif
++#endif
+ 
+ int RefCounter = 0;
+ 
+@@ -46,7 +65,18 @@ void* AllocateCodeMem()
  {
      std::lock_guard guard(globalMutex);
  
 -#if !defined(APPLE_AARCH64) && !defined(__NetBSD__) && !defined(__OpenBSD__)
 +#if !defined(APPLE_AARCH64) && !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__SWITCH__)
++#if defined(__PROSPERO__) && defined(SSR_PS5_NATIVE)
++    if (!CodeMemory)
++    {
++        CodeMemory = static_cast<u8*>(ps5_exec_allocate(CodeMemoryAlignedSize, reinterpret_cast<uintptr_t>(&AllocateCodeMem)));
++        if (!CodeMemory)
++        {
++            fprintf(stderr, "[ps5] JIT: no code memory\n");
++            return nullptr;
++        }
++    }
++#endif
      if (AvailableCodeMemSlices)
      {
          int slice = __builtin_ctz(AvailableCodeMemSlices);
-@@ -57,7 +59,9 @@ void* AllocateCodeMem()
+@@ -57,7 +87,9 @@ void* AllocateCodeMem()
  #endif
  
      // allocate
 -#ifdef _WIN32
-+#if defined(__SWITCH__)
++#if defined(__SWITCH__) || (defined(__PROSPERO__) && defined(SSR_PS5_NATIVE))
 +    return nullptr;
 +#elif defined(_WIN32)
      return VirtualAlloc(nullptr, CodeMemorySliceSize, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
  #elif defined(APPLE_AARCH64)
      return mmap(NULL, CodeMemorySliceSize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS | MAP_JIT,-1, 0);
-@@ -73,7 +77,7 @@ void FreeCodeMem(void* codeMem)
+@@ -73,7 +105,7 @@ void FreeCodeMem(void* codeMem)
  {
      std::lock_guard guard(globalMutex);
  
@@ -496,7 +539,7 @@ index e4aa42f..dac46f0 100644
      for (int i = 0; i < NumCodeMemSlices; i++)
      {
          if (codeMem == &GetAlignedCodeMemoryStart()[CodeMemorySliceSize * i])
-@@ -85,7 +89,9 @@ void FreeCodeMem(void* codeMem)
+@@ -85,7 +117,9 @@ void FreeCodeMem(void* codeMem)
      }
  #endif
  
@@ -507,12 +550,12 @@ index e4aa42f..dac46f0 100644
      VirtualFree(codeMem, CodeMemorySliceSize, MEM_RELEASE|MEM_DECOMMIT);
  #else
      munmap(codeMem, CodeMemorySliceSize);
-@@ -99,7 +105,8 @@ void Init()
+@@ -99,7 +133,8 @@ void Init()
      RefCounter++;
      if (RefCounter == 1)
      {
 -        #ifdef _WIN32
-+        #if defined(__SWITCH__)
++        #if defined(__SWITCH__) || (defined(__PROSPERO__) && defined(SSR_PS5_NATIVE))
 +        #elif defined(_WIN32)
              DWORD dummy;
              VirtualProtect(GetAlignedCodeMemoryStart(), CodeMemoryAlignedSize, PAGE_EXECUTE_READWRITE, &dummy);

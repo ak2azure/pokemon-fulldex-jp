@@ -1515,6 +1515,12 @@ bool Start(int& argc, char**& argv)
     // everything is in /data/pokemon-ds-wide on the console's storage, which an FTP server
     // payload (ftpsrv) can reach: the function tables in its data/funcs, the ROMs in roms.
     fo.dir = "/data/pokemon-ds-wide";
+#ifdef SSR_PS5_NATIVE
+    // The title (eboot.bin) starts in the console's sandbox, where /data is not there: the
+    // jailbreak (etaHEN) is asked to free it first (frontend/ps5_native.h), before any thread.
+    Ps5Native::Prepare();
+    const bool freed = Ps5Native::FreeFromSandbox(fo.dir.c_str());
+#endif
     MakeDir(fo.dir);
     fo.funcs = fo.dir + "/data/funcs";
 #elif !defined(_WIN32)
@@ -1551,6 +1557,18 @@ bool Start(int& argc, char**& argv)
         rename(logPath.c_str(), prev.c_str());
     }
     if (freopen(logPath.c_str(), "w", stderr)) setvbuf(stderr, nullptr, _IOLBF, 0);
+#ifdef SSR_PS5_NATIVE
+    // (Without /data, game.log goes to the title's own /download0, and the corner says why the
+    // list is empty.)
+    if (!freed)
+    {
+        if (freopen((std::string(Ps5Native::FallbackDir()) + "/game.log").c_str(), "w", stderr))
+            setvbuf(stderr, nullptr, _IOLBF, 0);
+        Ps5::Notify("Pokemon Fulldex: /data cannot be reached. Is etaHEN running?");
+    }
+    fprintf(stderr, "[ps5] the title (eboot.bin), pid %d, uid %d; /data %s\n", (int)getpid(), (int)geteuid(),
+        freed ? "reached" : "NOT reached");
+#endif
     fprintf(stderr, "[launcher] folder %s\n", fo.dir.c_str());
 #ifdef SSR_PS5
     Ps5::CloseAppAtExit();

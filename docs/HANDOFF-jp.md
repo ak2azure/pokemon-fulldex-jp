@@ -90,7 +90,18 @@
   - eboot.bin は ps5-native-app-boilerplate（leolobato、38c68b4、GPL-3）でビルドするネイティブアプリ（tools/ps5/launcher/main.cpp、sceNet で starter.elf を 127.0.0.1:9021 に送って、画面に「STARTING...」か失敗理由を出す）。ボイラープレートのタイトル ID チェックは PPSA だけなので、build.sh で [A-Z]{4} に書き換える。sce_sys は icon0.png と param.json だけ（背景は任意）。
   - starter.elf（tools/ps5/starter）は websrv（7748df9）の src/ps5/hbldr.c・elfldr.c・pt.c をビルド時に取ってきてリンクするペイロード。websrv と同じく sceUserServiceInitialize と authid 0x4801000000000013 のあと、/data/homebrew などから param.json に PKFD00001 がある eboot.elf を探して hbldr_launch（動いているアプリを閉じ、FAKE00000 を起動して eboot.elf に差し替える）。なので本体は websrv から起動したときと同じ権限で動く（JIT、/data、GPU）。
   - 終了（QUIT）で一覧に戻るのも starter.elf を 9021 に送る方式に変えた（starter.elf がなければ websrv の /hbldr）。
-  - ネイティブアプリとして本体を作り直す案は、ペイロード SDK の kernel_* に頼る JIT・/data が使えなくなるおそれがあるのでやめた。pkg（fPKG）にするなら、同じフォルダーを PS5-Suite の PKG ビルダーで固める方法がある（未着手）。
+  - ネイティブアプリとして本体を作り直す案は、ペイロード SDK の kernel_* に頼る JIT・/data が使えなくなるおそれがあるのでやめた。pkg（fPKG）にするなら、同じフォルダーを PS5-Suite の PKG ビルダーで固める方法がある（未着手）。→ 11/3 に Porpoise の方式でネイティブ化した（下の「PS5 のタイトル版」）。
+- PS5 のタイトル版（11/3、実機未確認）: 本体そのものを eboot.bin にしたネイティブタイトル PKFD00002「Pokémon Fulldex Native」。Porpoise（Dolphin、PPSA99764、https://github.com/elripalda/Porpoise-Dolphin-Emulator-for-PS5）と同じ作り。ペイロード版（PKFD00001）は実機で確認できるまで残す。
+  - ビルド: `tools/ps5/build_native.sh`（ワークフロー ps5.yml の ps5-native ジョブ、成果物 `pokemon-fulldex-ps5-native` はフォルダー PKFD00002/、PKFD00099/、pokemon-ds-wide/、licenses/）。表は `PS5_TABLES_ONLY=1 tools/ps5/build.sh` で作る。
+  - 作り方: CMake は今までどおり SDK の toolchain でコンパイルし、`-DSSR_PS5_NATIVE=ON` で ssrecomp の RULE_LAUNCH_LINK を `tools/ps5/native_link.py` にする。これが CMake のリンクコマンドから .o/.a を拾い、boilerplate（38c68b4）の app_crt.o・ps5-pie.ld（＋unwind 用の境界シンボル、tools/ps5/native/ps5-pie-unwind.ld）でリンクし、boilerplate の変換ツール（ps5-native-tool link）でコンソールのモジュール import にする。署名（self --sign）と sce_module/libc.prx（boilerplate が自分のソースから作る）も boilerplate のもの。
+  - Mesa は使えない（タイトルでは dlopen が通らない、と Porpoise の build.sh に記録）。なので画面は SDL のソフトウェア描画（ps5 ビデオドライバーは sceVideoOut を直接使うので、タイトルでも動くはず）、1920x1080、SSR_GPU3D=OFF。Ps5::UseGpu は native では false。GPU に戻すには Mesa（zink＋EGL）を PS5_Mesa の RADV と一緒に静的リンクするか、描画を Vulkan（PS5_Vulkan の RADV、Porpoise と同じ）にする必要がある。
+  - PS5_PayloadSDK（mihawk-99 の SDK フォーク、e105cf6）の platform/ 層を自分のスクリプトでコンパイルしてリンク（libps5platform.a）。使っているもの: ヒープ（malloc 系を --wrap、直接メモリの dlmalloc。タイトルの libc のヒープはすぐ尽きる）、スレッド（pthread_create を --wrap。タイトルのスレッドの既定スタックは 64KB しかない）、実行できるメモリ（ps5_exec_allocate: 直接メモリを RW で張ってから sceKernelMprotect で RWX、プログラムの ±2GB 以内）、タイトルで使えない libc 関数（opendir 系は getdents で、*at 系、localtime_r、getaddrinfo など。tools/ps5/native/wraps.c）。
+  - native_link.py はリンク後に import の一覧（.imports）を書き、platform 層の libc.h が「タイトルには実体がない」と挙げる関数が残っていたら失敗する（SDK のスタブはそれらも載せているので、リンクは通ってしまう）。libkernel_sys のスタブは渡さない。
+  - JIT: ARMJIT_Global.cpp の `__PROSPERO__ && SSR_PS5_NATIVE` で、128MB の静的配列をやめ、初回に ps5_exec_allocate（プログラムの近く）で 4 スライス分を取る。Ps5Native::CanRunJit も同じ方法で ret を実行して確かめる。
+  - /data: 起動直後（スレッドを作る前）に seteuid(geteuid())、/data/pokemon-ds-wide に書けなければ etaHEN に頼む（/download0/etahen_jailbreak などに {"PID":n} を .tmp 経由で、だめなら 127.0.0.1:9028/9069 にコマンド5）。最大10回。frontend/ps5_native.h（Porpoise の porpoise_jailbreak.cpp を移植、GPL-3）。届かなければ game.log は /download0 に書き、通知を出す。
+  - 終了: QUIT は sceSystemServiceLoadExec("/app0/eboot.bin")（Porpoise の再起動と同じ）、終わるときは LoadExec("exit")。スプラッシュは SDL の ps5 ビデオドライバーが画面を開くときに sceSystemServiceHideSplashScreen を呼ぶ。
+  - WSL でビルドが通ることを確認（eboot.bin 約 8MB、import 336 個、タイトルに実体のない関数なし）。リンクで分かったこと: libc++abi の __cxa_thread_atexit_impl はどのモジュールにもないので wraps.c で platform 層へ。thread_local の初期化フック（_ZTHN7melonDS3NDS7CurrentE）が弱い未定義のまま残ると変換ツールが失敗するので、native_link.py が空の関数を作って再リンクする。libunwind 用に __eh_frame_start などをリンカースクリプトで定義。
+  - テスト用タイトル PKFD00099「Fulldex Test」（tools/ps5/native/probe.cpp）: /data、ROM 一覧、1GB のヒープ、JIT、SDL、画面、音、パッドを順に試し、四角（緑/赤）と /data/pokemon-ds-wide/native-probe.log に出す。
 - ゲーム一覧のメニュー音（11/2）: `frontend/menusound.h`。リストに HG/SS の ROM（IPK*/IPG*）があれば、その SDAT（data/sound/gs_sound_data.sdat）から SEQ_SE_DP_SELECT（カーソル・設定の変更）、SEQ_SE_DP_DECIDE（ゲーム開始）、SEQ_SE_DP_WIN_OPEN（設定などを開く）、SEQ_SE_GS_GEARCANCEL（閉じる）を、DS のサウンドドライバーをなぞって PCM に書き出し、SDL の音声で鳴らす（ゲームの音はリポジトリにも配布物にも入らない）。HGSS のメニューはカーソルも A も B も DP_SELECT（decomp の list_menu_2d.c、options_app.c）、X メニューは開く WIN_OPEN・閉じる GEARCANCEL（start_menu.c）。X メニューのカーソル音は別の音（未特定）。
   - pc_launcher.cpp / switch_platform.cpp: ループの前後で状態（タブ、選択、設定ページの位置と中身、開いている窓）を比べて音を選ぶ。設定 GAME LIST: MENU SOUNDS（list_sounds、既定オン）と SOUND: VOLUME に従う。
   - 合わせ方: `--audio-dump FILE`（テスト用、ゲームの音を生の 16bit ステレオで書き出す）で HG の音を録り、押した版と押さない版の差で効果音だけを取り出して比べた。音の高さは一致。音量は、ベロシティだけ 2乗の曲線（40log）、トラック音量・エクスプレッション・シーケンス音量は 20log にすると WIN_OPEN が時間ごとに 1.4dB 以内で一致（全部 40log だと 11dB 小さく、音量変化が深すぎた）。全体のゲイン 1.65。
@@ -137,6 +148,7 @@
 ## 次にやること
 
 - PS5 版の実機確認（起動、速度、終了後の戻り方、JIT）。
+- PS5 のタイトル版（PKFD00002）の実機確認: タイルから起動、PS ボタンでホームと行き来、ゲーム一覧とゲームが JIT で動くか。だめなら PKFD00099 の四角と native-probe.log を見る。動いたらペイロード版をやめて、タイトル ID をどうするか決める。その後 GPU（Vulkan か静的 Mesa）。
 - ホワイト2（IRDJ）: 日本語版ROMが手に入れば IREJ と同じ方法で。
 
 ## 注意

@@ -19,6 +19,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include "ps5_native.h"
+
 extern "C" {
 // (As ps5-payload-sdk's samples declare them: libkernel and libSceSystemService.)
 struct Ps5NotifyRequest
@@ -61,6 +63,11 @@ inline void CloseAppAtExit()
 // "a:b" was looked in as a single folder and libEGL.so.1 was not found.
 inline void SetLibraryPath(const char* argv0)
 {
+#ifdef SSR_PS5_NATIVE
+    // (A title loads no libraries of its own: everything it uses is linked in.)
+    (void)argv0;
+    return;
+#endif
     std::string dir = "/data/homebrew/PKFD00001";
     if (argv0 && argv0[0] == '/' && strchr(argv0 + 1, '/'))
     {
@@ -95,6 +102,11 @@ inline int ConnectLocal(uint16_t port)
 // closed within 20 seconds; the program then just ends.
 inline bool Relaunch(const char* argv0)
 {
+#ifdef SSR_PS5_NATIVE
+    // (A title asks the shell to open it again.)
+    (void)argv0;
+    Ps5Native::Restart();
+#endif
     const std::string self = argv0 && argv0[0] == '/' ? argv0 : "/data/homebrew/PKFD00001/eboot.elf";
     const std::string starter = self.substr(0, self.find_last_of('/')) + "/starter.elf";
     if (FILE* f = fopen(starter.c_str(), "rb"))
@@ -162,10 +174,15 @@ inline bool Relaunch(const char* argv0)
 }
 
 // The game drawn by the graphics chip (SDL's OpenGL ES 2 renderer on Mesa) unless
-// SSR_PS5_SOFTWARE is set.
+// SSR_PS5_SOFTWARE is set. Not in the title (SSR_PS5_NATIVE): a title cannot load Mesa's
+// libraries (dlopen is refused there), so for now the processor draws its picture, 1920x1080.
 inline bool UseGpu()
 {
+#ifdef SSR_PS5_NATIVE
+    return false;
+#else
     return !getenv("SSR_PS5_SOFTWARE");
+#endif
 }
 
 // SDL's OpenGL ES 2 renderer says only "Couldn't find matching render driver" when anything
@@ -214,6 +231,9 @@ inline bool TestGpuContext(SDL_Window* window)
 // that fails the games keep to the interpreter rather than crash.
 inline bool CanRunJit()
 {
+#ifdef SSR_PS5_NATIVE
+    return Ps5Native::CanRunJit();
+#endif
     void* page = mmap(nullptr, 0x4000, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (page == MAP_FAILED)
     {
