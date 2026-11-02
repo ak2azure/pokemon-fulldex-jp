@@ -226,6 +226,11 @@ void WideGpuStop();
 // chip's attention first).
 std::unique_ptr<WideGpuBackend> WideGpuMakeDeko(std::string& info, bool small);
 #endif
+#ifdef SSR_WIDE_VK
+// Vulkan (GPU3D_WideGpu_Vk.cpp): on the device the PS5 title made for its picture, or one of its
+// own for drawing off the screen (a PC's tests, SSR_WIDE_GPU_API=vulkan).
+std::unique_ptr<WideGpuBackend> WideGpuMakeVk(std::string& info);
+#endif
 #ifdef OGLRENDERER_ENABLED
 std::unique_ptr<WideGpuBackend> WideGpuMakeGL(std::string& info);
 // Set by the frontend: an OpenGL function by name (for glClipControl, which the bundled

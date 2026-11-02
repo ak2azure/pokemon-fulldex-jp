@@ -122,6 +122,34 @@ if (ENABLE_OGLRENDERER)
     target_compile_definitions(core PRIVATE [[MELONDS_GL_HEADER="frontend/glad/glad.h"]])
 endif()
 
+# ssrecomp: the widescreen view on the graphics chip through Vulkan (SSR_WIDE_VK): WORLD ON GPU
+# on the PS5 title (RADV linked in), and on a PC for tests. Vulkan's headers from
+# SSR_VULKAN_INCLUDE (RADV's on the PS5) or the system's; the same shaders compiled to SPIR-V
+# by tools/vk_shaders.py with glslangValidator.
+option(SSR_WIDE_VK "Draw the widescreen view's polygons with Vulkan when chosen" OFF)
+if (SSR_WIDE_VK)
+    find_program(SSR_GLSLANG glslangValidator REQUIRED)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    set(SSR_VULKAN_INCLUDE "" CACHE PATH "Vulkan's headers (empty: the system's)")
+    set(SSR_WIDE_GPU_SPV "${CMAKE_CURRENT_BINARY_DIR}/wide_gpu_vk")
+    file(MAKE_DIRECTORY "${SSR_WIDE_GPU_SPV}")
+    file(GLOB _wide_glsl "${CMAKE_CURRENT_SOURCE_DIR}/wide_gpu/*.glsl")
+    add_custom_command(OUTPUT "${SSR_WIDE_GPU_SPV}/wide_gpu_spv.h"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/vk_shaders.py" "${SSR_GLSLANG}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/wide_gpu" "${SSR_WIDE_GPU_SPV}/wide_gpu_spv.h"
+        DEPENDS ${_wide_glsl} "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/vk_shaders.py"
+        VERBATIM)
+    target_sources(core PRIVATE VulkanSupport.cpp GPU3D_WideGpu_Vk.cpp "${SSR_WIDE_GPU_SPV}/wide_gpu_spv.h")
+    target_include_directories(core PRIVATE "${SSR_WIDE_GPU_SPV}")
+    if (SSR_VULKAN_INCLUDE)
+        target_include_directories(core PUBLIC "${SSR_VULKAN_INCLUDE}")
+    endif()
+    target_compile_definitions(core PUBLIC SSR_WIDE_VK)
+    if (UNIX AND NOT PROSPERO AND NOT PS5)
+        target_link_libraries(core PRIVATE ${CMAKE_DL_LIBS})
+    endif()
+endif()
+
 if (ENABLE_JIT)
     enable_language(ASM)
 

@@ -12,6 +12,9 @@
 #include <cstring>
 #include "GPU.h"
 #include "GPU3D.h"
+#ifdef SSR_WIDE_VK
+#include "VulkanSupport.h"
+#endif
 #include "SsrThreads.h"
 
 namespace melonDS
@@ -27,7 +30,21 @@ std::unique_ptr<WideGpuBackend> MakeBackend(std::string& info, bool small)
     (void)small;
 #ifdef SSR_DEKO3D
     return WideGpuMakeDeko(info, small);
-#elif defined(OGLRENDERER_ENABLED)
+#endif
+#ifdef SSR_WIDE_VK
+    // (Vulkan where the program has started it for its picture (the PS5 title), or when asked
+    // for by name; otherwise OpenGL where this build has it.)
+    {
+        const char* api = getenv("SSR_WIDE_GPU_API");
+#ifdef OGLRENDERER_ENABLED
+        if (Vk::Current() || (api && !strcmp(api, "vulkan"))) return WideGpuMakeVk(info);
+#else
+        (void)api;
+        return WideGpuMakeVk(info);
+#endif
+    }
+#endif
+#if defined(OGLRENDERER_ENABLED)
     return WideGpuMakeGL(info);
 #else
     info = "not in this build";
