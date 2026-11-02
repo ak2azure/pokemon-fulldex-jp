@@ -5869,8 +5869,11 @@ int main(int argc, char** argv)
                 (fieldActive() || menuReturn > 0 || scene.edgeFill || (singleView() && singleFieldFrame && rc_current_frame() - singleFieldFrame < 20)));
             melonDS::Wide.Owner = wantWide ? &nds->GPU.GPU3D : nullptr;
             melonDS::Wide.ViewWidth = view.width;
-            // (Only the Black games' views need polygons continued to the edges: see WideState.)
-            melonDS::Wide.ExtendEdges = funcWatchOn && !pt.on;
+            // (Only Black 2 and White 2's views need polygons continued to the edges: see
+            // WideState. Not Black and White's: on a town's rooftop the trees at the top of the
+            // overhead view were taken for the distance and drawn out to the view's edge; in the
+            // other places tried it changed nothing.)
+            melonDS::Wide.ExtendEdges = funcWatchOn && !pt.on && !bw1.on;
             melonDS::Wide.FlareAtLeft = bw1.SunFlare();
             melonDS::Wide.Width = ww;
             melonDS::Wide.Height = wh;
