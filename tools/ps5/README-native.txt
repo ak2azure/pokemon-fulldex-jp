@@ -17,13 +17,6 @@ It asks etaHEN to let it reach /data when it starts. If the corner of the screen
 cannot be reached, etaHEN is not running or did not free the title: its log is then in the
 title's own storage, not in /data.
 
-PKFD00099 (Fulldex Test) is a small test title. Copy it to /data/homebrew/PKFD00099 the same
-way and start it if the main one does not start: it tries each part on its own and shows a
-row of squares, green for each that worked and red for each that did not (/data, the ROM
-folder, memory, the JIT, SDL, the picture, the sound; a last one when a controller is found).
-The second row lights up with the buttons you press, Cross plays a tone, and Options closes
-it. It writes what it found to /data/pokemon-ds-wide/native-probe.log.
-
 The picture is drawn by the processor at 1920x1080 in this version (the graphics chip's 4K
 picture is not in it yet). The games run on the JIT. Saves go in /data/pokemon-ds-wide/saves,
 the log in /data/pokemon-ds-wide/game.log (send it with a bug report). QUIT in the pause menu
@@ -48,12 +41,6 @@ jailbreak した PS5 (etaHEN と kstuff) と ShadowMountPlus が必要です。�
 起動時に etaHEN に /data を使えるように頼みます。画面の隅に /data に届かないと出たら、etaHEN が
 動いていないか、タイトルを解放しませんでした (そのときログは /data ではなくタイトル自身の
 保存領域に書かれます)。
-
-PKFD00099 (Fulldex Test) は小さなテスト用タイトルです。本体が起動しないときは、同じように
-/data/homebrew/PKFD00099 にコピーして起動してください。部分ごとに試して四角を並べます。
-緑はうまくいったもの、赤はだめだったものです (/data、ROM フォルダー、メモリ、JIT、SDL、画面、
-音。コントローラーが見つかるともう一つ)。2 段目は押したボタンで光り、× で音が鳴り、
-OPTIONS で閉じます。結果は /data/pokemon-ds-wide/native-probe.log に書きます。
 
 この版の画面はプロセッサーが 1920x1080 で描きます (グラフィックスチップによる 4K はまだ
 入っていません)。ゲームは JIT で動きます。セーブは /data/pokemon-ds-wide/saves、ログは

@@ -23,7 +23,7 @@ jobs:
           name: pokemon-fulldex-ps5
           path: build-ps5-dist/pokemon-fulldex-ps5.zip
   # The program as a title of its own (eboot.bin, started from its Home screen tile): the
-  # folders PKFD00002 (the program), PKFD00099 (a test title) and pokemon-ds-wide, not zipped.
+  # folders PKFD00002 (the program) and pokemon-ds-wide, not zipped.
   ps5-native:
     runs-on: ubuntu-24.04
     steps:

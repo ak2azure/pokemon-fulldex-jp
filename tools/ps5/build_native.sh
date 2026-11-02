@@ -26,8 +26,6 @@
 #
 # The result, build-ps5-native-dist/ (a folder, not a zip):
 #   PKFD00002/        copied to /data/homebrew/PKFD00002: the title (Pokemon Fulldex Native)
-#   PKFD00099/        copied to /data/homebrew/PKFD00099: a small test title (Fulldex Test,
-#                     tools/ps5/native/probe.cpp) that tries each part on its own
 #   pokemon-ds-wide/  copied to /data/pokemon-ds-wide: the function tables; the ROMs go in roms
 set -euo pipefail
 
@@ -137,12 +135,18 @@ EOF
     python3 tools/ps5/make_icon.py "$dir/sce_sys/icon0.png"
 }
 
-say "The test title (tools/ps5/native/probe.cpp)"
-"$PS5_PAYLOAD_SDK/bin/prospero-clang++" -std=c++17 -O2 -DSSR_PS5_NATIVE \
-    -I"$PS5_PAYLOAD_SDK/target/user/homebrew/include/SDL2" -c tools/ps5/native/probe.cpp -o "$WORK/probe.o"
-python3 tools/ps5/native_link.py --config "$WORK/link.json" --out "$WORK/probe.elf" "$WORK/probe.o" \
-    "$PS5_PAYLOAD_SDK/target/user/homebrew/lib/libSDL2.a" "$PS5_PAYLOAD_SDK/target/user/homebrew/lib/libiconv.a"
-title "$DIST/$PROBE_ID" "$PROBE_ID" "Fulldex Test" "$WORK/probe.elf"
+# PS5_PROBE=1: also the test title, PKFD00099 "Fulldex Test" (tools/ps5/native/probe.cpp: /data,
+# the ROM folder, the heap, the JIT, SDL's parts, the picture, sound and the pad, each tried on
+# its own), in $WORK/PKFD00099. Not part of the download.
+if [ -n "${PS5_PROBE:-}" ]; then
+    say "The test title (tools/ps5/native/probe.cpp)"
+    "$PS5_PAYLOAD_SDK/bin/prospero-clang++" -std=c++17 -O2 -DSSR_PS5_NATIVE \
+        -I"$PS5_PAYLOAD_SDK/target/user/homebrew/include/SDL2" -c tools/ps5/native/probe.cpp -o "$WORK/probe.o"
+    python3 tools/ps5/native_link.py --config "$WORK/link.json" --out "$WORK/probe.elf" "$WORK/probe.o" \
+        "$PS5_PAYLOAD_SDK/target/user/homebrew/lib/libSDL2.a" "$PS5_PAYLOAD_SDK/target/user/homebrew/lib/libiconv.a"
+    rm -rf "$WORK/$PROBE_ID"
+    title "$WORK/$PROBE_ID" "$PROBE_ID" "Fulldex Test" "$WORK/probe.elf"
+fi
 
 say "Compiling the program for the PS5, as a title"
 (
@@ -182,7 +186,7 @@ cp tools/ps5/README-native.txt "$DIST/README.txt"
 (cd "$DIST" && find . -mindepth 1 | sed 's|^\./||' | python3 -c "
 import re, sys
 title = r'(eboot\.bin|sce_module|sce_module/libc\.prx|sce_sys|sce_sys/icon0\.png|sce_sys/param\.json)'
-ok = re.compile(r'^(README\.txt|licenses(/[A-Za-z0-9_.-]+\.txt)?|(PKFD00002|PKFD00099)(/' + title + r')?|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
+ok = re.compile(r'^(README\.txt|licenses(/[A-Za-z0-9_.-]+\.txt)?|PKFD00002(/' + title + r')?|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
 bad = [l for l in sys.stdin.read().split() if not ok.match(l)]
 if bad: sys.exit('unexpected files in the download: %s' % bad)
 ")
