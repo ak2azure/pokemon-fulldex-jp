@@ -13,11 +13,14 @@
 # as for the Switch's all-games download; the download holds nothing of the games.
 #
 # The result, build-ps5-dist/pokemon-fulldex-ps5.zip:
-#   homebrew/PokemonFulldex/     copied to /data/homebrew/PokemonFulldex on the PS5 and started
-#                                from websrv's homebrew list (ps5-payload-websrv): eboot.elf, the
-#                                payload, with its icon and homebrew.js. It runs as an application
-#                                there, which a payload needs to show its picture: sent straight
-#                                to elfldr, SDL could not open the video output.
+#   homebrew/PKFD00001/          copied to /data/homebrew/PKFD00001 on the PS5: eboot.elf, the
+#                                program (a payload), with Mesa's libraries; eboot.bin, sce_module
+#                                and sce_sys, the Home screen app that ShadowMountPlus registers
+#                                (tools/ps5/launcher); starter.elf, which that app sends to the ELF
+#                                loader to start eboot.elf as an application (tools/ps5/starter),
+#                                which a payload needs to show its picture: sent straight to
+#                                elfldr, SDL could not open the video output. homebrew.js puts it
+#                                in websrv's homebrew list too.
 #   pokemon-ds-wide/             copied to /data/pokemon-ds-wide on the PS5 (FTP, ftpsrv): its
 #                                data/funcs holds the function tables, the ROMs go in its roms
 #
@@ -42,6 +45,13 @@ SDL_REPO=https://github.com/ps5-payload-dev/SDL.git
 SDL_COMMIT=ee4c47dc0d617b3bc8f35108f9956baf228a1322
 PACBREW_REPO=https://github.com/ps5-payload-dev/pacbrew-repo.git
 PACBREW_COMMIT=722187f0ee246c0d7d57401c8a97de1c7f4e2ff0
+# The starter's way of starting the program (hbldr.c and what it uses) and the Home screen app's
+# build (eboot.bin from an ordinary ELF, the runtime module, the signature), both GPL-3.0.
+WEBSRV_REPO=https://github.com/ps5-payload-dev/websrv.git
+WEBSRV_COMMIT=7748df9d2a43822a5ebfda149f43d4f2696d640b
+BOILERPLATE_REPO=https://github.com/leolobato/ps5-native-app-boilerplate.git
+BOILERPLATE_COMMIT=38c68b4645ab6a1470c7598df1a3fc10d3e0cae0
+TITLE_ID=PKFD00001
 
 say() { printf '\n== %s\n' "$*"; }
 fail() { printf '\nerror: %s\n' "$*" >&2; exit 1; }
@@ -50,8 +60,8 @@ fail() { printf '\nerror: %s\n' "$*" >&2; exit 1; }
     fail "no ps5-payload-sdk in $PS5_PAYLOAD_SDK (PS5_PAYLOAD_SDK: where it is)"
 [ -f "$PS5_PAYLOAD_SDK/target/user/homebrew/lib/libSDL2.a" ] ||
     fail "ps5-payload-sdk has no SDL2: unpack pacbrew-repo's ps5-payload-dev.tar.gz at /"
-for tool in git ninja python3 clang-18 ld.lld-18; do
-    command -v "$tool" >/dev/null || fail "$tool is not installed (Ubuntu: sudo apt install git ninja-build python3 clang-18 lld-18)"
+for tool in git ninja python3 clang-18 ld.lld-18 make wget unzip; do
+    command -v "$tool" >/dev/null || fail "$tool is not installed (Ubuntu: sudo apt install git ninja-build python3 clang-18 lld-18 make wget unzip)"
 done
 
 fetch_symbols() { # dir url commit paths...
@@ -117,6 +127,30 @@ EOF
 SDL_LIB="$PS5_PAYLOAD_SDK/target/user/homebrew/lib/libSDL2.a"
 if [ -w "$SDL_LIB" ]; then cp build-ps5-sdl/build/libSDL2.a "$SDL_LIB"; else sudo cp build-ps5-sdl/build/libSDL2.a "$SDL_LIB"; fi
 
+say "The Home screen app (ps5-native-app-boilerplate)"
+# Built in the boilerplate's own checkout, with its own pinned SDK, before this one's toolchain
+# is in the environment. Its checks allow only PPSA titles (a game's); ShadowMountPlus takes
+# homebrew titles too (four letters and five digits), as Playden's FAKE77031.
+fetch_symbols build-ps5-boilerplate "$BOILERPLATE_REPO" "$BOILERPLATE_COMMIT" '/*'
+python3 - build-ps5-boilerplate/tools/build.sh <<'EOF'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+n = s.count(r"PPSA\d{5}")
+assert n == 2, "the boilerplate's title checks have changed"
+open(p, "w").write(s.replace(r"PPSA\d{5}", r"[A-Z]{4}\d{5}"))
+EOF
+rm -rf build-ps5-boilerplate/fulldex
+mkdir -p build-ps5-boilerplate/fulldex/src build-ps5-boilerplate/fulldex/sce_sys
+cp tools/ps5/launcher/main.cpp build-ps5-boilerplate/src/demo_renderer.cpp build-ps5-boilerplate/src/demo_renderer.hpp \
+    build-ps5-boilerplate/fulldex/src/
+cp tools/ps5/launcher/param.json build-ps5-boilerplate/fulldex/param.json
+python3 tools/ps5/make_icon.py build-ps5-boilerplate/fulldex/sce_sys/icon0.png
+make -C build-ps5-boilerplate app USE_CCACHE=0 HOST_CC=clang-18 HOST_CXX=clang++-18 APP_SOURCE_DIR=fulldex/src \
+    APP_PARAM=fulldex/param.json APP_SCE_SYS=fulldex/sce_sys APP_ASSETS= >/dev/null
+APP_BUILT="build-ps5-boilerplate/dist/$TITLE_ID"
+[ -f "$APP_BUILT/eboot.bin" ] || fail "the Home screen app was not built"
+
 say "Compiling for the PS5"
 # (The toolchain file sets PS5, which makes CMakeLists.txt build the payload: SSR_PS5.)
 source "$PS5_PAYLOAD_SDK/toolchain/prospero.sh"
@@ -124,10 +158,23 @@ source "$PS5_PAYLOAD_SDK/toolchain/prospero.sh"
     -DSSR_PNG=OFF -DSSR_GPU3D=ON -DSSR_PORTABLE_X86=ON -DSSR_GENERATED_DIR="$HERE/build-gen-tables" \
     -DCMAKE_VERBOSE_MAKEFILE=OFF >/dev/null
 ninja -C build-ps5 ssrecomp
-HB=build-ps5-dist/homebrew/PokemonFulldex
+HB="build-ps5-dist/homebrew/$TITLE_ID"
 mkdir -p "$HB/sce_sys"
 "$STRIP" -o "$HB/eboot.elf" build-ps5/pokemon-fulldex.elf
 cp tools/ps5/homebrew.js "$HB/homebrew.js"
+# The Home screen app's files beside the program: eboot.bin, its runtime module and sce_sys.
+cp "$APP_BUILT/eboot.bin" "$HB/eboot.bin"
+cp -r "$APP_BUILT/sce_module" "$HB/sce_module"
+cp "$APP_BUILT/sce_sys/param.json" "$HB/sce_sys/param.json"
+
+say "The starter (websrv's way of starting homebrew)"
+fetch_symbols build-ps5-websrv "$WEBSRV_REPO" "$WEBSRV_COMMIT" '/src/ps5/*' '/LICENSE'
+# (hbldr.c's "fs.h", "sys.h" and "websrv.h" are tools/ps5/starter's: not in its own folder.)
+"$CC" -O2 -Wall -Itools/ps5/starter -Ibuild-ps5-websrv/src/ps5 -o build-ps5/starter.elf \
+    tools/ps5/starter/main.c tools/ps5/starter/fs.c build-ps5-websrv/src/ps5/hbldr.c \
+    build-ps5-websrv/src/ps5/elfldr.c build-ps5-websrv/src/ps5/pt.c \
+    -lkernel_sys -lSceSystemService -lSceUserService
+"$STRIP" -o "$HB/starter.elf" build-ps5/starter.elf
 # Mesa (MIT licence): EGL and OpenGL ES, gallium's zink and RADV, found beside eboot.elf
 # (LD_LIBRARY_PATH, frontend/ps5.h); everything else they use is the console's own.
 MESA="$PS5_PAYLOAD_SDK/target/user/homebrew/lib"
@@ -140,7 +187,7 @@ cp tools/ps5/README.txt build-ps5-dist/README.txt
 # Only the payload, the tables, the notes and the empty folders: never a ROM, save or game code.
 (cd build-ps5-dist && find . -mindepth 1 | sed 's|^\./||' | python3 -c "
 import re, sys
-ok = re.compile(r'^(README\.txt|homebrew(/PokemonFulldex(/(eboot\.elf|homebrew\.js|sce_sys|sce_sys/icon0\.png|libEGL\.so\.1|libGLESv2\.so\.2|libGL\.so\.1|libvulkan\.so\.1|libgallium-[0-9.]+\.so))?)?|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
+ok = re.compile(r'^(README\.txt|homebrew(/$TITLE_ID(/(eboot\.elf|eboot\.bin|starter\.elf|sce_module|sce_module/libc\.prx|homebrew\.js|sce_sys|sce_sys/icon0\.png|sce_sys/param\.json|libEGL\.so\.1|libGLESv2\.so\.2|libGL\.so\.1|libvulkan\.so\.1|libgallium-[0-9.]+\.so))?)?|pokemon-ds-wide(/(LICENSE\.txt|roms|saves|data|data/funcs|data/funcs/(IREO|IRDO|IRBO|IRAO|IRBJ|IRAJ|IREJ|CPUE|CPUJ)\.txt))?)$')
 bad = [l for l in sys.stdin.read().split() if not ok.match(l)]
 if bad: sys.exit('unexpected files in the download: %s' % bad)
 ")

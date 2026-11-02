@@ -1651,7 +1651,7 @@ void Finish()
         CloseHandle(pi.hProcess);
     }
 #elif defined(SSR_PS5)
-    // (A payload cannot start itself again: websrv, which started it, is asked to; without it
+    // (A payload cannot start itself again: the starter (or websrv) is asked to; without either
     // the program just ends.)
     Ps5::Relaunch(g_args.empty() ? nullptr : g_args[0].c_str());
 #elif defined(__APPLE__)

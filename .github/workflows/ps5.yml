@@ -11,7 +11,7 @@ jobs:
       - name: Prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends git cmake ninja-build python3 clang-18 lld-18
+          sudo apt-get install -y --no-install-recommends git cmake ninja-build python3 clang-18 lld-18 make wget unzip
           # ps5-payload-sdk with its libraries (SDL2 among them), as pacbrew-repo releases it.
           curl -fsSL -o /tmp/ps5-payload-dev.tar.gz \
             https://github.com/ps5-payload-dev/pacbrew-repo/releases/latest/download/ps5-payload-dev.tar.gz

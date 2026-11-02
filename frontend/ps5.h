@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 #include <arpa/inet.h>
 #include <cctype>
 #include <netinet/in.h>
@@ -55,12 +56,12 @@ inline void CloseAppAtExit()
 
 // Mesa's libraries (EGL, OpenGL ES, gallium's zink, RADV) are beside eboot.elf, where the
 // SDK's loader finds them through LD_LIBRARY_PATH (it reads it at each dlopen): the program's
-// own folder, from argv[0], else websrv's usual one. One folder only: the loader does not split
+// own folder, from argv[0], else the app's usual one. One folder only: the loader does not split
 // the list at its colons (crt/rtld.c tests the path being built for ':', not the list), so
 // "a:b" was looked in as a single folder and libEGL.so.1 was not found.
 inline void SetLibraryPath(const char* argv0)
 {
-    std::string dir = "/data/homebrew/PokemonFulldex";
+    std::string dir = "/data/homebrew/PKFD00001";
     if (argv0 && argv0[0] == '/' && strchr(argv0 + 1, '/'))
     {
         dir = argv0;
@@ -70,14 +71,67 @@ inline void SetLibraryPath(const char* argv0)
     fprintf(stderr, "[ps5] started as %s; libraries from %s\n", argv0 ? argv0 : "?", dir.c_str());
 }
 
-// The program started again, for the game list after QUIT. A payload cannot start itself, but
-// websrv, which started it, starts homebrew on request (GET /hbldr?path=..., as its homebrew
-// list does): it closes the running application (this one) first, then starts the new one. So
-// this asks and waits to be closed. False if websrv is not there to ask (the program was sent to
-// elfldr instead) or did not close it within 20 seconds; the program then just ends.
+// A connection to a server on the console itself (the ELF loader, websrv), or -1.
+inline int ConnectLocal(uint16_t port)
+{
+    const int s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) return -1;
+    sockaddr_in addr;
+    memset(&addr, 0, sizeof addr);
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (connect(s, (sockaddr*)&addr, sizeof addr) == 0) return s;
+    close(s);
+    return -1;
+}
+
+// The program started again, for the game list after QUIT. A payload cannot start itself, so
+// it sends starter.elf, beside it, to the ELF loader (port 9021): the starter closes the running
+// application (this one) and starts eboot.elf again, as the Home screen app has it do
+// (tools/ps5/starter). Without the starter (an older folder), websrv is asked instead, which
+// starts homebrew on request (GET /hbldr?path=..., as its homebrew list does) the same way.
+// Either way this waits to be closed. False if neither is there to ask or the program was not
+// closed within 20 seconds; the program then just ends.
 inline bool Relaunch(const char* argv0)
 {
-    std::string self = argv0 && argv0[0] == '/' ? argv0 : "/data/homebrew/PokemonFulldex/eboot.elf";
+    const std::string self = argv0 && argv0[0] == '/' ? argv0 : "/data/homebrew/PKFD00001/eboot.elf";
+    const std::string starter = self.substr(0, self.find_last_of('/')) + "/starter.elf";
+    if (FILE* f = fopen(starter.c_str(), "rb"))
+    {
+        std::vector<char> elf;
+        char buf[16384];
+        for (size_t n; (n = fread(buf, 1, sizeof buf, f)) > 0;) elf.insert(elf.end(), buf, buf + n);
+        fclose(f);
+        const int s = ConnectLocal(9021);
+        if (s >= 0)
+        {
+            fprintf(stderr, "[ps5] sending %s to the ELF loader to start the program again for the game list
+",
+                starter.c_str());
+            fflush(stderr);
+            size_t done = 0;
+            while (done < elf.size())
+            {
+                const ssize_t n = send(s, elf.data() + done, elf.size() - done, 0);
+                if (n <= 0) break;
+                done += (size_t)n;
+            }
+            close(s);
+            if (done == elf.size())
+            {
+                for (int i = 0; i < 20; i++) sleep(1);
+                fprintf(stderr, "[ps5] the starter did not start the program again within 20 seconds
+");
+                return false;
+            }
+            fprintf(stderr, "[ps5] the ELF loader did not take all of the starter (%s)
+", strerror(errno));
+        }
+        else
+            fprintf(stderr, "[ps5] no ELF loader on port 9021 (%s): trying websrv
+", strerror(errno));
+    }
     std::string path;
     for (unsigned char c : self)
     {
@@ -89,21 +143,19 @@ inline bool Relaunch(const char* argv0)
             path += hex;
         }
     }
-    const int s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0) return false;
-    sockaddr_in addr;
-    memset(&addr, 0, sizeof addr);
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(8080);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if (connect(s, (sockaddr*)&addr, sizeof addr) != 0)
+    const int s = ConnectLocal(8080);
+    if (s < 0)
     {
-        fprintf(stderr, "[ps5] websrv is not running (%s): the program ends\n", strerror(errno));
-        close(s);
+        fprintf(stderr, "[ps5] websrv is not running (%s): the program ends
+", strerror(errno));
         return false;
     }
-    const std::string req = "GET /hbldr?pipe=0&daemon=0&path=" + path + " HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n";
-    fprintf(stderr, "[ps5] asking websrv to start %s again for the game list\n", self.c_str());
+    const std::string req = "GET /hbldr?pipe=0&daemon=0&path=" + path + " HTTP/1.0
+Host: 127.0.0.1
+
+";
+    fprintf(stderr, "[ps5] asking websrv to start %s again for the game list
+", self.c_str());
     fflush(stderr);
     send(s, req.data(), req.size(), 0);
     // websrv answers only after it has closed this application and started the new one, so an
@@ -113,7 +165,8 @@ inline bool Relaunch(const char* argv0)
     char buf[256];
     const ssize_t n = recv(s, buf, sizeof buf - 1, 0);
     buf[n > 0 ? n : 0] = 0;
-    fprintf(stderr, "[ps5] websrv did not start the program again: %s\n", n > 0 ? buf : "no answer");
+    fprintf(stderr, "[ps5] websrv did not start the program again: %s
+", n > 0 ? buf : "no answer");
     close(s);
     return false;
 }
