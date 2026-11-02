@@ -4,8 +4,10 @@ OpenGL) for Vulkan, as SPIR-V built into a header (GPU3D_WideGpu_Vk.cpp). The so
 they are; for Vulkan, which numbers its bindings in one space for every kind, their storage
 buffers are moved to bindings 8 and on and their textures to 16 and on, gl_VertexID is Vulkan's
 gl_VertexIndex, and the stages' in and out variables get locations by name (--aml).
+With "render", the PS5 title's stand-in for SDL's renderer (frontend/vk/*.glsl, written for
+Vulkan) instead.
 
-    python3 tools/vk_shaders.py <glslangValidator> <wide_gpu folder> <out.h>
+    python3 tools/vk_shaders.py <glslangValidator> <wide_gpu folder> <out.h> [render]
 """
 import os
 import re
@@ -20,6 +22,10 @@ SHADERS = [
     ("wide_fsh_early_spv", "wide_fsh.glsl", "frag", ["WIDE_EARLY"]),
     ("final_vsh_spv", "final_vsh.glsl", "vert", []),
     ("final_fsh_spv", "final_fsh.glsl", "frag", []),
+]
+RENDER_SHADERS = [
+    ("render_vsh_spv", "render_vsh.glsl", "vert", []),
+    ("render_fsh_spv", "render_fsh.glsl", "frag", []),
 ]
 
 
@@ -39,13 +45,16 @@ def for_vulkan(text, defines):
 
 
 def main():
-    if len(sys.argv) != 4:
+    if len(sys.argv) not in (4, 5):
         sys.exit(__doc__)
     glslang, folder, out = sys.argv[1:4]
+    render = sys.argv[4:] == ["render"]
     parts = ["// Made by tools/vk_shaders.py from wide_gpu/*.glsl: do not edit.\n#pragma once\n#include <cstdint>\n"]
     with tempfile.TemporaryDirectory() as tmp:
-        for name, src, stage, defines in SHADERS:
-            text = for_vulkan(open(os.path.join(folder, src)).read(), defines)
+        for name, src, stage, defines in (RENDER_SHADERS if render else SHADERS):
+            text = open(os.path.join(folder, src)).read()
+            if not render:
+                text = for_vulkan(text, defines)
             glsl = os.path.join(tmp, name + "." + stage)
             spv = os.path.join(tmp, name + ".spv")
             open(glsl, "w").write(text)

@@ -46,7 +46,8 @@ namespace Vk
     X(vkCmdSetScissor) X(vkCmdSetDepthCompareOp) X(vkCmdSetDepthWriteEnable) \
     X(vkCmdSetDepthTestEnable) X(vkCmdSetStencilTestEnable) X(vkCmdSetStencilOp) \
     X(vkCmdSetStencilCompareMask) X(vkCmdSetStencilReference) X(vkCmdSetStencilWriteMask) \
-    X(vkCmdPushConstants) X(vkCmdBlitImage) X(vkCmdClearColorImage) \
+    X(vkCmdPushConstants) X(vkCmdBlitImage) X(vkCmdClearColorImage) X(vkCmdBindVertexBuffers) \
+    X(vkFreeDescriptorSets) \
     X(vkCreateSwapchainKHR) X(vkDestroySwapchainKHR) X(vkGetSwapchainImagesKHR) \
     X(vkAcquireNextImageKHR) X(vkQueuePresentKHR)
 
