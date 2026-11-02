@@ -25,6 +25,11 @@ struct WideState
     // and Platinum, whose overhead views have none and where it only stretched trees and opened
     // cracks between the ground's tiles.
     bool ExtendEdges = true;
+    // Black and White's sunshine (their clear weather, set by the frontend while it runs): its
+    // lens flare is one picture on a polygon over the view's upper left corner, which squeezed
+    // like the world would shine from the DS's corner in the middle of the wide view. It keeps
+    // its size and is moved to the wide view's corner instead (GPU3D_Wide.cpp, FlareAtCorner).
+    bool FlareAtLeft = false;
 
     // The image that belongs to the frame the 2D renderer has just output: XRGB, with
     // the top byte 0 where no polygon was drawn. Three buffers take turns, so it stays as it

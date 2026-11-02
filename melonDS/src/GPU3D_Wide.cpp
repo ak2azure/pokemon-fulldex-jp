@@ -582,7 +582,35 @@ struct WideAccess
                     bottom |= p[1] < 0;
                 }
                 fillsView = fillsView && left && right && top && bottom;
-                if (fillsView)
+                // Black and White's lens flare in their sunshine (WideState::FlareAtLeft): a
+                // quad with a translucent picture (A5I3) over the view's upper left corner, at
+                // least a quarter of the view wide and high (the trees' leaves, also A5I3, are far
+                // smaller). Squeezed towards the left edge instead of the middle, it shines from
+                // the wide view's corner.
+                bool flareAtCorner = Wide.FlareAtLeft && nverts == 4 && ((cur.TexParam >> 26) & 7) == 6;
+                if (flareAtCorner)
+                {
+                    s64 x0 = INT64_MAX, x1 = INT64_MIN, y0 = INT64_MAX, y1 = INT64_MIN;
+                    for (int i = 0; i < 4 && flareAtCorner; i++)
+                    {
+                        const s32* p = g.TempVertexBuffer[i].Position;
+                        if (p[3] <= 0) flareAtCorner = false;
+                        // (In view coordinates scaled by 4096: -4096 is the left edge, 4096 the top.)
+                        x0 = std::min(x0, (s64)p[0] * 4096 / std::max(1, p[3]));
+                        x1 = std::max(x1, (s64)p[0] * 4096 / std::max(1, p[3]));
+                        y0 = std::min(y0, (s64)p[1] * 4096 / std::max(1, p[3]));
+                        y1 = std::max(y1, (s64)p[1] * 4096 / std::max(1, p[3]));
+                    }
+                    flareAtCorner = flareAtCorner && x0 < -4096 && x1 > -4096 && y0 < 4096 && y1 > 4096 &&
+                        x1 - x0 >= 2048 && y1 - y0 >= 2048;
+                }
+                if (flareAtCorner)
+                    for (int i = 0; i < 4; i++)
+                    {
+                        s32* p = g.TempVertexBuffer[i].Position;
+                        p[0] = (s32)(((s64)p[0] * xnum + (s64)p[3] * (xnum - xden)) / xden);
+                    }
+                else if (fillsView)
                 {
                     if (cur.TexParam & (1 << 16)) // repeats across: more of the texture, not a wider one
                     {

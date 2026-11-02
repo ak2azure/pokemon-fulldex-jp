@@ -5871,6 +5871,7 @@ int main(int argc, char** argv)
             melonDS::Wide.ViewWidth = view.width;
             // (Only the Black games' views need polygons continued to the edges: see WideState.)
             melonDS::Wide.ExtendEdges = funcWatchOn && !pt.on;
+            melonDS::Wide.FlareAtLeft = bw1.SunFlare();
             melonDS::Wide.Width = ww;
             melonDS::Wide.Height = wh;
             wideFrames = wantWide ? wideFrames + 1 : 0;

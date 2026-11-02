@@ -80,6 +80,9 @@ public:
         // asks YES / NO ("Give a nickname?"), which is polled by BTLV_INPUT_ProcessTouchInput.
         dexRegister = find("ZUKAN_TOROKU_GRAPHIC_Main");
         touchInput = find("BTLV_INPUT_ProcessTouchInput");
+        // Sunshine (the clear weather, run every frame while it lasts): its lens flare is moved
+        // to the wide view's corner (melonDS/src/GPU3D_Wide.h, FlareAtLeft).
+        clearWeather = find("WEATHER_CLEAR_Run");
         // The overworld's frame and the battle's two touch-screen menus (not watched again here:
         // the shared table already does).
         field = fw.Find("FieldmapProc_Update");
@@ -88,6 +91,9 @@ public:
         targetMenu = fw.Find("BtlvCore_WaitTargetSelect");
         fprintf(stderr, "[bw1] Pokemon Black: badges %d, card edit %d, save %d\n", badges, cardEdit, report);
     }
+
+    // The sunshine's lens flare is up (see Init).
+    bool SunFlare() const { return on && Fw->Ran(clearWeather, 4); }
 
     void Adjust(Scene& sc, float viewWidth, const ScreenImage* screens)
     {
@@ -231,7 +237,7 @@ public:
 
 private:
     const FuncWatch* Fw = nullptr;
-    int badges = -1, cardEdit = -1, report = -1, field = -1, dexRegister = -1, touchInput = -1;
+    int badges = -1, cardEdit = -1, report = -1, field = -1, dexRegister = -1, touchInput = -1, clearWeather = -1;
     int commandMenu = -1, moveMenu = -1, targetMenu = -1;
     bool saving = false; // the save's screen was shown last
 

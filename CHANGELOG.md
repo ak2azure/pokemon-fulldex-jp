@@ -5,6 +5,8 @@
 - **SoulSilver and HeartGold (Japanese): the battle buttons beside the message** show their whole
   labels (BAG, RUN and the moves' PP were cut at the buttons' ends), and the arrows reach the
   third and fourth moves.
+- **Black and White's sunshine** (the lens flare when you step out into it) shines from the
+  corner of the widescreen view, not from the DS screen's corner in the middle of it.
 - **Indoors in the widescreen view** (HeartGold, SoulSilver, Platinum): the black beyond a
   room's walls stays black beside the screen, instead of the room's last column drawn out into
   streaks.
