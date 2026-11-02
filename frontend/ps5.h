@@ -10,7 +10,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <arpa/inet.h>
+#include <cctype>
+#include <netinet/in.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 extern "C" {
 // (As ps5-payload-sdk's samples declare them: libkernel and libSceSystemService.)
@@ -62,6 +68,54 @@ inline void SetLibraryPath(const char* argv0)
     }
     setenv("LD_LIBRARY_PATH", dir.c_str(), 1);
     fprintf(stderr, "[ps5] started as %s; libraries from %s\n", argv0 ? argv0 : "?", dir.c_str());
+}
+
+// The program started again, for the game list after QUIT. A payload cannot start itself, but
+// websrv, which started it, starts homebrew on request (GET /hbldr?path=..., as its homebrew
+// list does): it closes the running application (this one) first, then starts the new one. So
+// this asks and waits to be closed. False if websrv is not there to ask (the program was sent to
+// elfldr instead) or did not close it within 20 seconds; the program then just ends.
+inline bool Relaunch(const char* argv0)
+{
+    std::string self = argv0 && argv0[0] == '/' ? argv0 : "/data/homebrew/PokemonFulldex/eboot.elf";
+    std::string path;
+    for (unsigned char c : self)
+    {
+        if (isalnum(c) || c == '/' || c == '-' || c == '_' || c == '.') path += (char)c;
+        else
+        {
+            char hex[4];
+            snprintf(hex, sizeof hex, "%%%02X", c);
+            path += hex;
+        }
+    }
+    const int s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) return false;
+    sockaddr_in addr;
+    memset(&addr, 0, sizeof addr);
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(8080);
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (connect(s, (sockaddr*)&addr, sizeof addr) != 0)
+    {
+        fprintf(stderr, "[ps5] websrv is not running (%s): the program ends\n", strerror(errno));
+        close(s);
+        return false;
+    }
+    const std::string req = "GET /hbldr?pipe=0&daemon=0&path=" + path + " HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n";
+    fprintf(stderr, "[ps5] asking websrv to start %s again for the game list\n", self.c_str());
+    fflush(stderr);
+    send(s, req.data(), req.size(), 0);
+    // websrv answers only after it has closed this application and started the new one, so an
+    // answer means it could not.
+    timeval tv = { 20, 0 };
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+    char buf[256];
+    const ssize_t n = recv(s, buf, sizeof buf - 1, 0);
+    buf[n > 0 ? n : 0] = 0;
+    fprintf(stderr, "[ps5] websrv did not start the program again: %s\n", n > 0 ? buf : "no answer");
+    close(s);
+    return false;
 }
 
 // The game drawn by the graphics chip (SDL's OpenGL ES 2 renderer on Mesa) unless

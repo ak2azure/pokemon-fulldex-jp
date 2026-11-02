@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **PS5: QUIT in the pause menu goes back to the game list** instead of ending the program.
 - **60 FPS in-between frames while running past things close to the camera** (Black's rocks):
   their faces no longer split apart with the ground showing through, every other frame.
 - **SoulSilver and HeartGold (Japanese): the battle buttons beside the message** show their whole

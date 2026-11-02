@@ -16,8 +16,8 @@ Do not send eboot.elf to elfldr by itself: started that way it cannot show its p
 A notification in the corner of the screen says what went wrong if it cannot start.
 
 Saves go in /data/pokemon-ds-wide/saves, the settings in settings.cfg and the log in game.log
-beside them (send game.log with a bug report). QUIT (or CHANGE GAME) in the pause menu ends the
-program: start it again from the homebrew list for the game list.
+beside them (send game.log with a bug report). QUIT in the pause menu goes back to the game
+list (websrv starts the program again; started without websrv, the program ends).
 
 This version draws the picture with the PS5's processor and runs the games on a JIT (on the
 interpreter if the console does not allow it; game.log says which), so some places may be slow.
@@ -40,5 +40,5 @@ eboot.elf を elfldr に直接送らないでください。その起動方法�
 起動できないときは、画面の隅の通知に理由が出ます。
 
 セーブは /data/pokemon-ds-wide/saves、設定は settings.cfg、ログは game.log です。
-ポーズメニューの終了 (ゲーム変更) でプログラムが終わります。リストに戻るにはホームブリューの一覧からもう一度起動してください。
+ポーズメニューの終了でゲーム一覧に戻ります (websrv がプログラムを起動し直します。websrv を使わずに起動したときはプログラムが終わります)。
 この版は画面を CPU で描き、JIT で動きます (使えない本体ではインタプリタ。どちらかは game.log に出ます)。重い場面があるかもしれません。

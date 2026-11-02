@@ -1651,8 +1651,9 @@ void Finish()
         CloseHandle(pi.hProcess);
     }
 #elif defined(SSR_PS5)
-    // (A payload cannot start itself again: the program ends, and is sent again for the list.)
-    return;
+    // (A payload cannot start itself again: websrv, which started it, is asked to; without it
+    // the program just ends.)
+    Ps5::Relaunch(g_args.empty() ? nullptr : g_args[0].c_str());
 #elif defined(__APPLE__)
     char self[4096];
     uint32_t size = sizeof self;
