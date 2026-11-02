@@ -260,12 +260,44 @@ inline void StartPicture()
     static bool tried = false;
     if (tried) return;
     tried = true;
-    // (RADV keeps the shaders it has compiled on disk, for a quicker start the next time: in the
-    // player's folder, which a title can write once it is out of the sandbox.)
-    mkdir("/data/pokemon-ds-wide/cache", 0777);
-    setenv("MESA_SHADER_CACHE_DIR", "/data/pokemon-ds-wide/cache", 0);
+    // (RADV keeps the shaders it has compiled on disk, for a quicker start the next time, in its
+    // own default place, the title's /app0/radv-shader-cache, as Porpoise has it. The first
+    // Vulkan build had it in /data/pokemon-ds-wide/cache and stopped on the console right
+    // where RADV opens that cache.)
+    //
+    // A start that never finishes leaves a mark behind (the console closes the title), and the
+    // next start of the same build draws with the processor instead of stopping again. A new
+    // build tries Vulkan again; so does deleting the mark.
+    const char* mark = "/data/pokemon-ds-wide/vulkan-starting";
+    const std::string build = __DATE__ " " __TIME__;
+    if (FILE* f = fopen(mark, "rb"))
+    {
+        char was[64] = {};
+        fread(was, 1, sizeof was - 1, f);
+        fclose(f);
+        if (build == was)
+        {
+            fprintf(stderr, "[ps5] the graphics chip did not finish starting last time: the processor "
+                            "draws (delete %s to try again)\n", mark);
+            Notify("Pokemon Fulldex: the graphics chip did not start last time: the processor draws");
+            return;
+        }
+    }
+    if (FILE* f = fopen(mark, "wb"))
+    {
+        fputs(build.c_str(), f);
+        fclose(f);
+    }
     std::string info;
-    if (VkRender::Start(info, true))
+    bool started;
+    {
+#ifdef SSR_PS5_NATIVE
+        Ps5Native::Watch watch("the graphics chip's start (Vulkan)", 10);
+#endif
+        started = VkRender::Start(info, true);
+    }
+    remove(mark);
+    if (started)
     {
         setenv("SDL_VIDEODRIVER", "dummy", 1);
         int w = 0, h = 0;

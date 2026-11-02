@@ -61,8 +61,12 @@ bool Make(Context& c, std::string& info, bool display, PFN_vkGetInstanceProcAddr
     ici.pApplicationInfo = &app;
     ici.enabledExtensionCount = display ? 2 : 0;
     ici.ppEnabledExtensionNames = instExt;
+    // (Each step is logged before it is taken: on the PS5 a start once stopped inside RADV with
+    // nothing in the log.)
+    fprintf(stderr, "[vulkan] making the instance\n");
     VkResult r = vkCreateInstance(&ici, nullptr, &c.Instance);
     if (r != VK_SUCCESS) return Fail(info, "vkCreateInstance", r);
+    fprintf(stderr, "[vulkan] looking for the graphics chip\n");
 #define SSR_VK_LOAD(name) name = (PFN_##name)vkGetInstanceProcAddr(c.Instance, #name);
     SSR_VK_INSTANCE_FNS(SSR_VK_LOAD)
 #undef SSR_VK_LOAD
@@ -71,6 +75,7 @@ bool Make(Context& c, std::string& info, bool display, PFN_vkGetInstanceProcAddr
     vkEnumeratePhysicalDevices(c.Instance, &n, nullptr);
     std::vector<VkPhysicalDevice> gpus(n);
     vkEnumeratePhysicalDevices(c.Instance, &n, gpus.data());
+    fprintf(stderr, "[vulkan] %u graphics chip(s)\n", n);
     for (VkPhysicalDevice g : gpus)
     {
         VkPhysicalDeviceProperties p;
@@ -113,6 +118,7 @@ bool Make(Context& c, std::string& info, bool display, PFN_vkGetInstanceProcAddr
     dci.pQueueCreateInfos = &qci;
     dci.enabledExtensionCount = display ? 1 : 0;
     dci.ppEnabledExtensionNames = devExt;
+    fprintf(stderr, "[vulkan] making the device on %s\n", c.Name.c_str());
     r = vkCreateDevice(c.Gpu, &dci, nullptr, &c.Device);
     if (r != VK_SUCCESS) return Fail(info, "vkCreateDevice", r);
 #define SSR_VK_LOAD(name) name = (PFN_##name)vkGetDeviceProcAddr(c.Device, #name);

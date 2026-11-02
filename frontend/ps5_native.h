@@ -13,7 +13,13 @@
 #if defined(SSR_PS5_NATIVE)
 
 #include <cerrno>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
+#include <mutex>
+#include <thread>
+#include <pthread.h>
+#include <ucontext.h>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -216,6 +222,31 @@ inline void Put(const char* s)
     write(2, s, strlen(s));
 }
 
+inline void OnCrash(int sig, siginfo_t* info, void*);
+
+// The words on a stack, from sp up, that point into the program's code: the return addresses
+// of the calls that led there. (eboot.bin is about 32 MB with RADV in it, so the range is wide.)
+inline void ShowStack(const uint64_t* sp)
+{
+    Put("[ps5] return addresses near the program's code, innermost first:\n");
+    const uint64_t self = (uint64_t)(uintptr_t)&OnCrash;
+    char line[32];
+    int shown = 0;
+    for (int i = 0; i < 4096 && shown < 48; i++)
+    {
+        const uint64_t v = sp[i];
+        if (v + 0x6000000 > self && v < self + 0x6000000)
+        {
+            char* p = line;
+            *p++ = ' ';
+            Hex(p, v);
+            *p++ = '\n';
+            write(2, line, (size_t)(p - line));
+            shown++;
+        }
+    }
+}
+
 inline void OnCrash(int sig, siginfo_t* info, void*)
 {
     char line[160];
@@ -235,27 +266,28 @@ inline void OnCrash(int sig, siginfo_t* info, void*)
     Hex(p, (uint64_t)(uintptr_t)&OnCrash);
     *p++ = '\n';
     write(2, line, (size_t)(p - line));
-    Put("[ps5] return addresses near the program's code, innermost first:\n");
-    const uint64_t self = (uint64_t)(uintptr_t)&OnCrash;
     uint64_t local = 0;
-    const uint64_t* sp = &local;
-    int shown = 0;
-    for (int i = 0; i < 4096 && shown < 48; i++)
-    {
-        const uint64_t v = sp[i];
-        if (v + 0x2000000 > self && v < self + 0x2000000)
-        {
-            p = line;
-            *p++ = ' ';
-            Hex(p, v);
-            *p++ = '\n';
-            write(2, line, (size_t)(p - line));
-            shown++;
-        }
-    }
+    ShowStack(&local);
     Put("[ps5] end of the crash report\n");
     signal(sig, SIG_DFL);
     raise(sig);
+}
+
+// Where a thread that has stopped moving is (Watch below): the instruction it was interrupted
+// at, then the return addresses on its stack, as for a crash.
+inline void OnWhere(int, siginfo_t*, void* context)
+{
+    const mcontext_t& m = static_cast<ucontext_t*>(context)->uc_mcontext;
+    char line[64];
+    char* p = line;
+    const char* head = "[ps5] it is at ";
+    memcpy(p, head, strlen(head));
+    p += strlen(head);
+    Hex(p, (uint64_t)m.mc_rip);
+    *p++ = '\n';
+    write(2, line, (size_t)(p - line));
+    ShowStack(reinterpret_cast<const uint64_t*>(m.mc_rsp));
+    Put("[ps5] end of the report\n");
 }
 }
 
@@ -269,6 +301,54 @@ inline void LogCrashes()
     for (const int sig : { SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT }) sigaction(sig, &sa, nullptr);
     fprintf(stderr, "[ps5] crashes are logged (OnCrash at %p)\n", (void*)&Detail::OnCrash);
 }
+
+// A watch over a step that might never finish (the graphics chip's start, which once stopped
+// inside RADV with nothing in the log): if the thread that made it is still in the step after
+// the given time, the log says so and where that thread is (Detail::OnWhere, through SIGUSR1).
+class Watch
+{
+public:
+    Watch(const char* what, int seconds) : What(what), Seconds(seconds), Target(pthread_self())
+    {
+        struct sigaction sa;
+        memset(&sa, 0, sizeof sa);
+        sa.sa_sigaction = Detail::OnWhere;
+        sa.sa_flags = SA_SIGINFO | SA_RESTART;
+        sigemptyset(&sa.sa_mask);
+        sigaction(SIGUSR1, &sa, nullptr);
+        Thread = std::thread([this] { Run(); });
+    }
+    ~Watch()
+    {
+        {
+            std::lock_guard<std::mutex> lock(Lock);
+            Done = true;
+        }
+        Wake.notify_all();
+        Thread.join();
+    }
+
+private:
+    void Run()
+    {
+        std::unique_lock<std::mutex> lock(Lock);
+        for (int reported = 0; !Done && reported < 3; reported++)
+        {
+            if (Wake.wait_for(lock, std::chrono::seconds(Seconds), [this] { return Done; })) break;
+            fprintf(stderr, "[ps5] %s has not finished after %d s; where it is:\n", What,
+                    Seconds * (reported + 1));
+            pthread_kill(Target, SIGUSR1);
+        }
+    }
+
+    const char* What;
+    int Seconds;
+    pthread_t Target;
+    std::mutex Lock;
+    std::condition_variable Wake;
+    bool Done = false;
+    std::thread Thread;
+};
 
 // A notice for when there is no /data: written where a title can always write, its
 // /download0, since game.log has no folder to go in.

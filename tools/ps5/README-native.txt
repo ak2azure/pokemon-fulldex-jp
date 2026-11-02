@@ -20,7 +20,8 @@ title's own storage, not in /data.
 The picture is drawn by the graphics chip (Vulkan) at the largest resolution the TV takes
 (4K on a 4K TV), and so is the widescreen world (WORLD ON GPU in the pause menu). If the
 graphics chip cannot be started, the corner of the screen says so and the processor draws the
-picture at 1920x1080. The games run on the JIT. Saves go in /data/pokemon-ds-wide/saves,
+picture at 1920x1080. If the screen stays black at the start, close the title (PS button) and
+start it again: it then draws with the processor. The games run on the JIT. Saves go in /data/pokemon-ds-wide/saves,
 the log in /data/pokemon-ds-wide/game.log (send it with a bug report). QUIT in the pause menu
 goes back to the game list.
 
@@ -46,6 +47,8 @@ jailbreak した PS5 (etaHEN と kstuff) と ShadowMountPlus が必要です。�
 
 画面はグラフィックスチップ (Vulkan) が、テレビが受け取れるいちばん大きい解像度 (4K のテレビなら 4K)
 で描きます。ワイド表示の 3D も同じです (ポーズメニューの WORLD ON GPU)。グラフィックスチップを
-使えないときは画面の隅にそう出て、プロセッサーが 1920x1080 で描きます。ゲームは JIT で動きます。セーブは /data/pokemon-ds-wide/saves、ログは
+使えないときは画面の隅にそう出て、プロセッサーが 1920x1080 で描きます。起動時に画面が黒いまま
+止まったら、タイトルを閉じて (PS ボタン) もう一度起動してください。次はプロセッサーで描きます。
+ゲームは JIT で動きます。セーブは /data/pokemon-ds-wide/saves、ログは
 /data/pokemon-ds-wide/game.log です (不具合の報告にはこれを付けてください)。ポーズメニューの
 QUIT でゲームリストに戻ります。
