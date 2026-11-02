@@ -111,40 +111,6 @@ inline bool TestGpuContext(SDL_Window* window)
     return true;
 }
 
-// A picture (XRGB, w x h) saved as a 24-bit BMP, for measuring what a screen shows (the PS5
-// build has no PNG writer).
-inline void WriteBmp(const std::string& path, const uint32_t* px, int w, int h)
-{
-    FILE* f = fopen(path.c_str(), "wb");
-    if (!f) return;
-    const int row = (w * 3 + 3) & ~3;
-    const uint32_t size = 54 + row * h;
-    unsigned char hd[54] = { 'B', 'M' };
-    auto put32 = [&](int at, uint32_t v) { for (int i = 0; i < 4; i++) hd[at + i] = (unsigned char)(v >> (8 * i)); };
-    put32(2, size);
-    put32(10, 54);
-    put32(14, 40);
-    put32(18, (uint32_t)w);
-    put32(22, (uint32_t)h);
-    hd[26] = 1;
-    hd[28] = 24;
-    put32(34, row * h);
-    fwrite(hd, 1, sizeof hd, f);
-    std::string line(row, '\0');
-    for (int y = h - 1; y >= 0; y--) // (bottom row first)
-    {
-        for (int x = 0; x < w; x++)
-        {
-            const uint32_t c = px[y * w + x];
-            line[x * 3] = (char)(c & 0xFF);
-            line[x * 3 + 1] = (char)(c >> 8 & 0xFF);
-            line[x * 3 + 2] = (char)(c >> 16 & 0xFF);
-        }
-        fwrite(line.data(), 1, line.size(), f);
-    }
-    fclose(f);
-}
-
 // Whether melonDS's JIT can run here: code made at run time needs memory that can be written
 // and then run, which ps5-payload-sdk's libc asks the kernel for (mmap and mprotect with
 // PROT_EXEC: kernel_mprotect). A page is asked for and a return instruction run in it; if

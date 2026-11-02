@@ -78,6 +78,9 @@
   - ただし、ワイド表示の3Dは CPU が描くので、WIDESCREEN RES が 2160 だと間に合わない（wide 待ち 17ms）。PS5 では LOWER RES WHEN BUSY を既定でオンにした。3D も GPU で描く（WORLD ON GPU、GL 4.3 が必要。zink は GL 4.6）のが次の段階。
   - WORLD ON GPU（11/2、実機未確認）: PS5 も SSR_GPU3D=ON。GPU3D_WideGpu_GL.cpp が専用スレッドで desktop GL 4.3 core のコンテキストを作る。PS5 では glcontext.cpp が libEGL.so.1 を RTLD_GLOBAL で dlopen して（SDL より先。後から SDL が読み込むときも同じものを共有する）関数を dlsym で取る。EGL はリンクしない（起動時のローダーは LD_LIBRARY_PATH を知らないため）。libGL.so.1 も配布物に入れた。失敗して落ちたら、次回の起動で自動的にオフになる（WideGpuMarker）。
   - **WORLD ON GPU は実機で動いた（11/2）。** フィールドは 2160本・4K 出力で 60fps（wide の待ち 0ms）。ポーズメニューは 4K で CPU が描いて 24ms かかっていたので、PS5 で 4K のときはオーバーレイを半分のサイズで描いて GPU で2倍に拡大するようにした（scene 5ms、遅れたフレームは 300中6）。メニューの上下は押し続けるとリピートする（共通部分の変更）。
+- HG 日本語版のバトル（11/2、実機で直ったことを確認）: 横長ボタンの切り分け（gen4BattleInput の Cut）は英語版の文字幅で決め打ちだったので、画面の列を見て文字の範囲を広げるようにした。技の欄が使えるかの判定は1点から15点にした（日本語版の3つ目・4つ目の技に行けなかった）。本家 issue #39「4th move is not selectable」も同じ問題かもしれない。
+- 未解決: HG・プラチナの室内で、部屋の端の列（カウンター、鉢植えの段、床）がワイド部分に横に伸びる。WORLD ON GPU をオフにしても起きる（共通部分の問題）。本家に報告なし。WSL を入れて Linux のヘッドレス版で再現して調べる予定。
+- 本家（upstream/main）に未取り込みのコミットが8つある（11/1〜2 のホットフィックス：暗い洞窟、フェード、HGSS 図鑑、アップデーターなど）。
 - 未確認・今後: ほかの作品（ホワイト、ブラック2、プラチナ、SS/HG）の PS5 での動作、ときどき落ちるフレーム、終了後に黒い画面が残らないか（インタプリタで重い可能性）、終了後リストへ戻る方法、JIT（sceKernelJitCreateSharedMemory 等）。
 
 ## ROMの場所（ユーザーPC）

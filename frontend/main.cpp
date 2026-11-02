@@ -6016,12 +6016,9 @@ int main(int argc, char** argv)
             const bool cmd = merged && !strcmp(scene.name, "battle-cmd"), moves = merged && !strcmp(scene.name, "battle-moves");
             if (!paused && (cmd || moves))
             {
-                static int stripKindFrames = 0;
-                stripKindFrames++;
                 if (stripKind != scene.name)
                 {
                     stripKind = scene.name;
-                    stripKindFrames = 0;
                     battleSel = 0;
                     prevStripKeys = keys; // a key still held from before does not count
                 }
@@ -6048,22 +6045,6 @@ int main(int argc, char** argv)
                         }
                     return white >= 3;
                 };
-#ifdef SSR_PS5
-                // (The PS5 test version: the touch screen half a second into each panel's first
-                // showing, and which move slots count as used, to measure the Japanese games'
-                // panels by.)
-                if (stripKindFrames == 30)
-                {
-                    static std::set<std::string> dumped;
-                    if (dumped.insert(scene.name).second)
-                    {
-                        const std::string path = opt.save.substr(0, opt.save.find_last_of('/') + 1) + scene.name + ".bmp";
-                        Ps5::WriteBmp(path, screenImagesPrev, 256, 192);
-                        if (moves)
-                            fprintf(stderr, "[strip] %s: move slots used %d %d %d %d (%s)\n", scene.name, usable(0), usable(1), usable(2), usable(3), path.c_str());
-                    }
-                }
-#endif
                 if (singleView())
                 {
                     // (The single-screen build's strip: one row.)

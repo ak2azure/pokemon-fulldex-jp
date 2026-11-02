@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **SoulSilver and HeartGold (Japanese): the battle buttons beside the message** show their whole
+  labels (BAG, RUN and the moves' PP were cut at the buttons' ends), and the arrows reach the
+  third and fourth moves.
 - **The pause menu: hold up or down** on a controller to move through the rows quickly, as in the
   game list.
 - **PS5 (test version)**: the all-games program as homebrew for a jailbroken PS5, started from
