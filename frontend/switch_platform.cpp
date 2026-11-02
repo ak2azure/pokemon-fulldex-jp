@@ -24,6 +24,7 @@
 #undef STB_IMAGE_IMPLEMENTATION
 #include "launcher.h"
 #include "controls.h"
+#include "menusound.h"
 #ifdef SSR_GBA
 #include <map>
 #include "gba_games.h" // Pokemon GBA Widescreen, built in: its GBA games (CMakeLists.txt, SSR_GBA_DIR)
@@ -277,8 +278,34 @@ int PickGame(const std::vector<Launcher::Game>& games, int selected, const std::
         (void)key;
 #endif
     };
+    // HeartGold and SoulSilver's menu sounds (menusound.h, from one of their ROMs in the list), on
+    // SDL's audio while the list is up: as pc_launcher.cpp, each pass compares what the list
+    // shows before and after it. The game chosen: the choice's sound; a window opened (the
+    // settings, KEYS AND BUTTONS) or closed: the window's; anything else: the cursor's.
+    auto soundSettings = [&]() {
+        std::vector<std::pair<std::string, std::string>> roms;
+        for (const Launcher::Game& g : games) roms.push_back({ g.code, g.rom });
+        const std::string volume = Launcher::ConfigValue(cfgPath, "volume");
+        MenuSound::Start(roms, autoFrames == 0 && Launcher::ConfigValue(cfgPath, "list_sounds") != "0",
+            volume.empty() ? 100 : atoi(volume.c_str()));
+    };
+    soundSettings();
+    struct Shown
+    {
+        std::vector<int> where;
+        int windows = 0; // (bits: the settings, KEYS AND BUTTONS)
+        size_t file = 0; // (the settings file as the page has it)
+    };
+    auto showing = [&]() {
+        Shown s;
+        s.where = { tab, selected, onTabs, onSettings, page.group, page.selected, keysMenu.selected, keysCapture };
+        s.windows = (guide ? 1 : 0) | (keysOpen ? 2 : 0);
+        for (const std::string& l : page.lines) s.file = s.file * 131 + std::hash<std::string>()(l);
+        return s;
+    };
     while (appletMainLoop())
     {
+        const Shown before = showing();
 #ifdef SSR_ALL_GAMES
         // (Set during the last pass, which then showed INSTALLING... on the screen.)
         if (installIcons)
@@ -445,6 +472,13 @@ int PickGame(const std::vector<Launcher::Game>& games, int selected, const std::
             }
             if (down & (HidNpadButton_Plus | (ctl.PadCustom() ? action(Controls::B) : (u64)HidNpadButton_B))) break;
         }
+        {
+            const Shown after = showing();
+            if (after.file != before.file) soundSettings(); // (MENU SOUNDS or VOLUME may have changed)
+            if (after.windows & ~before.windows) MenuSound::Play(MenuSound::WINDOW);
+            else if (before.windows & ~after.windows) MenuSound::Play(MenuSound::CLOSE);
+            else if (after.where != before.where || after.file != before.file) MenuSound::Play(MenuSound::SELECT);
+        }
         // (The game list only when the settings page is not open: drawn over it, the page was
         // hidden while it took the buttons, and the list seemed frozen.)
         if (guide)
@@ -480,6 +514,8 @@ int PickGame(const std::vector<Launcher::Game>& games, int selected, const std::
         }
         framebufferEnd(&fb);
     }
+    if (result >= 0) MenuSound::Play(MenuSound::DECIDE);
+    MenuSound::Stop();
     framebufferClose(&fb);
     return result;
 }

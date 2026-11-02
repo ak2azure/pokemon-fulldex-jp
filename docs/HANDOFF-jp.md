@@ -91,6 +91,10 @@
   - starter.elf（tools/ps5/starter）は websrv（7748df9）の src/ps5/hbldr.c・elfldr.c・pt.c をビルド時に取ってきてリンクするペイロード。websrv と同じく sceUserServiceInitialize と authid 0x4801000000000013 のあと、/data/homebrew などから param.json に PKFD00001 がある eboot.elf を探して hbldr_launch（動いているアプリを閉じ、FAKE00000 を起動して eboot.elf に差し替える）。なので本体は websrv から起動したときと同じ権限で動く（JIT、/data、GPU）。
   - 終了（QUIT）で一覧に戻るのも starter.elf を 9021 に送る方式に変えた（starter.elf がなければ websrv の /hbldr）。
   - ネイティブアプリとして本体を作り直す案は、ペイロード SDK の kernel_* に頼る JIT・/data が使えなくなるおそれがあるのでやめた。pkg（fPKG）にするなら、同じフォルダーを PS5-Suite の PKG ビルダーで固める方法がある（未着手）。
+- ゲーム一覧のメニュー音（11/2）: `frontend/menusound.h`。リストに HG/SS の ROM（IPK*/IPG*）があれば、その SDAT（data/sound/gs_sound_data.sdat）から SEQ_SE_DP_SELECT（カーソル・設定の変更）、SEQ_SE_DP_DECIDE（ゲーム開始）、SEQ_SE_DP_WIN_OPEN（設定などを開く）、SEQ_SE_GS_GEARCANCEL（閉じる）を、DS のサウンドドライバーをなぞって PCM に書き出し、SDL の音声で鳴らす（ゲームの音はリポジトリにも配布物にも入らない）。HGSS のメニューはカーソルも A も B も DP_SELECT（decomp の list_menu_2d.c、options_app.c）、X メニューは開く WIN_OPEN・閉じる GEARCANCEL（start_menu.c）。X メニューのカーソル音は別の音（未特定）。
+  - pc_launcher.cpp / switch_platform.cpp: ループの前後で状態（タブ、選択、設定ページの位置と中身、開いている窓）を比べて音を選ぶ。設定 GAME LIST: MENU SOUNDS（list_sounds、既定オン）と SOUND: VOLUME に従う。
+  - 合わせ方: `--audio-dump FILE`（テスト用、ゲームの音を生の 16bit ステレオで書き出す）で HG の音を録り、押した版と押さない版の差で効果音だけを取り出して比べた。音の高さは一致。音量は、ベロシティだけ 2乗の曲線（40log）、トラック音量・エクスプレッション・シーケンス音量は 20log にすると WIN_OPEN が時間ごとに 1.4dB 以内で一致（全部 40log だと 11dB 小さく、音量変化が深すぎた）。全体のゲイン 1.65。
+  - WSL での確認: PC 全ゲーム版（build-all、SSR_PC_ALL_GAMES）を SDL_AUDIODRIVER=disk と xdotool で動かし、移動5回でカーソル音5回、設定の開閉で WIN_OPEN と GEARCANCEL を確認。
 - WSL（Ubuntu-24.04）を入れた: `wsl -d Ubuntu-24.04 -u root`。/root/fulldex（Windows のクローンから git clone）、/root/work（ROM とセーブのコピー、IRBJ.txt）。Git Bash からは MSYS_NO_PATHCONV=1 を付けて、スクリプトをファイルで渡す。表だけ＋JIT のビルドは数分。
 - 本家（upstream/main）に未取り込みのコミットが8つある（11/1〜2 のホットフィックス：暗い洞窟、フェード、HGSS 図鑑、アップデーターなど）。
 - 未確認・今後: ほかの作品（ホワイト、ブラック2、プラチナ、SS/HG）の PS5 での動作、ときどき落ちるフレーム、終了後に黒い画面が残らないか（インタプリタで重い可能性）、JIT（sceKernelJitCreateSharedMemory 等）。

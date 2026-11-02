@@ -482,6 +482,7 @@ struct Options
     bool autoFocus = true;
     bool layoutGiven = false;
     bool audioStats = false;
+    std::string audioDump;               // write the game's sound to this file (raw)
     int interp60 = -1;                   // 3D frame interpolation: -1 = from settings (off when headless)
     int gpu3d = -1;                      // 3D on the graphics chip: -1 = from settings (off when headless)
     bool battleMash = false;             // test aid: tap A through battles, pausing the script meanwhile
@@ -549,6 +550,7 @@ static void Usage()
         "                       frame used by --state-at) still, so scripts can walk through grass\n"
         "  --count-changes      report on how many frames the top screen image changed\n"
         "  --audio-stats        print the peak and RMS level of the generated audio at exit\n"
+        "  --audio-dump FILE    write the game's sound to FILE (raw 16-bit stereo, the DS's rate)\n"
         "  --shot-layers        with each screenshot, also write layers_<frame>.png colouring every\n"
         "                       pixel by the 2D layer it came from\n"
 
@@ -576,6 +578,7 @@ static bool ParseArgs(int argc, char** argv, Options& o)
         else if (a == "--layout") { o.layout = next(); o.layoutGiven = true; }
         else if (a == "--config") o.config = next();
         else if (a == "--audio-stats") o.audioStats = true;
+        else if (a == "--audio-dump") o.audioDump = next();
         else if (a == "--shot-layers") o.shotLayers = true;
         else if (a == "--count-changes") o.countChanges = true;
         else if (a == "--battle-mash") o.battleMash = true;
@@ -1327,7 +1330,7 @@ struct Settings
     bool ffLowRes = true;
     // VOLUME: the game's sound and music, 0 (off) to 100 in tens.
     int volume = 100;
-    std::string listColour, listBackground, listLanguage; // (GAME LIST: COLOUR, BACKGROUND, LANGUAGE)
+    std::string listColour, listBackground, listLanguage, listSounds; // (GAME LIST: COLOUR, BACKGROUND, LANGUAGE, MENU SOUNDS)
     bool cpuBoost = true; // Switch only: the processor's boost mode (see SwitchPlatform)
     bool jit = true;      // Switch, games that are not recompiled: melonDS's JIT (read at start-up)
     bool fastMem = true;  // ... and its fast memory (also read at start-up)
@@ -1402,6 +1405,7 @@ struct Settings
             else if (k == "list_colour") { listColour = v; Menu::Accent = AccentNamed(v); }
             else if (k == "list_background") listBackground = v;
             else if (k == "list_language") { listLanguage = v; I18n::SetLanguage(v); }
+            else if (k == "list_sounds") listSounds = v;
             else if (k == "ff_low_res") ffLowRes = v == "1";
             else if (k == "start_button") startMenu = v != "ds";
             else if (k == "cpu_boost") cpuBoost = v == "1";
@@ -1453,6 +1457,7 @@ struct Settings
         if (!listColour.empty()) f << "list_colour=" << listColour << "\n";
         if (!listBackground.empty()) f << "list_background=" << listBackground << "\n";
         if (!listLanguage.empty()) f << "list_language=" << listLanguage << "\n";
+        if (!listSounds.empty()) f << "list_sounds=" << listSounds << "\n";
         f << "start_button=" << (startMenu ? "menu" : "ds") << "\n";
         f << "battle_buttons=" << (battleButtons == 0 ? "corner" : battleButtons == 2 ? "panel" : "strip") << "\n";
         controls.Save(f);
@@ -6776,6 +6781,11 @@ int main(int argc, char** argv)
             // Drop audio rather than let latency grow if the queue backs up.
             if (queued < 48000 / 4 && !audioOut.empty())
                 SDL_QueueAudio(audio, audioOut.data(), (Uint32)(audioOut.size() * 2));
+        }
+        if (!opt.audioDump.empty() && got > 0)
+        {
+            static FILE* dump = fopen(opt.audioDump.c_str(), "wb");
+            if (dump) fwrite(audioBuf.data(), sizeof(int16_t), (size_t)got * 2, dump);
         }
         if (opt.audioStats && got > 0)
         {

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **The game list has HeartGold and SoulSilver's menu sounds** (the cursor, choosing a game,
+  opening and closing the settings), taken from your own ROM of either when one is in the list.
+  GAME LIST: MENU SOUNDS turns them off; they follow SOUND: VOLUME.
 - **PS5: an app on the Home screen.** Copied to /data/homebrew/PKFD00001, ShadowMountPlus adds
   Pokémon Fulldex to the Home screen, and it starts without websrv (it needs an ELF loader on
   port 9021, such as etaHEN's). QUIT goes back to the game list that way too.

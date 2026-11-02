@@ -907,6 +907,9 @@ inline std::vector<Setting> SettingsList()
     // The menus' language (frontend/i18n.h). (Its values are drawn as they are: the Japanese
     // one in Japanese.)
     l.push_back({ "list_language", "LANGUAGE", { { "ja", "日本語" }, { "en", "ENGLISH" } }, "ja", "THE MENUS' LANGUAGE: JAPANESE OR ENGLISH." });
+    // (frontend/menusound.h)
+    l.push_back({ "list_sounds", "MENU SOUNDS", onOff, "1",
+                  "ON: THIS LIST PLAYS HEARTGOLD AND SOULSILVER'S MENU SOUNDS, TAKEN FROM YOUR OWN ROM OF EITHER IN THE LIST (AT THE VOLUME SET IN SOUND)." });
     l.push_back({ "list_colour", "COLOUR", { { "red", "RED" }, { "blue", "BLUE" }, { "green", "GREEN" }, { "purple", "PURPLE" },
                   { "gold", "GOLD" }, { "pink", "PINK" }, { "teal", "TEAL" } }, "red",
                   "THE GAME LIST'S COLOUR: ITS LINES, THE FRAME ROUND THE CHOSEN GAME AND THE TABS." });

@@ -45,6 +45,7 @@
 #include "achievements.h"
 #include "ssr_os.h"
 #include "ps5.h"
+#include "menusound.h"
 #if !defined(SSR_PHONE) && !defined(__SWITCH__)
 #include "shortcuts.h"
 #endif
@@ -821,8 +822,34 @@ int PickGame(Folders& fo, std::vector<Launcher::Game>& games, int selected, bool
             note.clear();
         }
     };
+    // HeartGold and SoulSilver's menu sounds (menusound.h, from one of their ROMs in the list):
+    // each pass of the loop compares what the list shows before and after its events. The game
+    // chosen: the choice's sound; a window opened (the settings, KEYS AND BUTTONS, LOG IN) or
+    // closed: the window's; anything else moved or changed: the cursor's, as their menus do.
+    auto soundSettings = [&]() {
+        std::vector<std::pair<std::string, std::string>> roms;
+        for (const Launcher::Game& g : games) roms.push_back({ g.code, g.rom });
+        const std::string volume = Launcher::ConfigValue(fo.cfg, "volume");
+        MenuSound::Start(roms, Launcher::ConfigValue(fo.cfg, "list_sounds") != "0", volume.empty() ? 100 : atoi(volume.c_str()));
+    };
+    soundSettings();
+    struct Shown
+    {
+        std::vector<int> where;
+        int windows = 0; // (bits: the settings, KEYS AND BUTTONS, LOG IN)
+        size_t file = 0; // (the settings file as the page has it)
+    };
+    auto shown = [&]() {
+        Shown s;
+        s.where = { tab, selected, onTabs, onSettings, onBack, page.group, page.selected, keysMenu.selected, raMenu.selected,
+                    keysCapture };
+        s.windows = (guide ? 1 : 0) | (keysOpen ? 2 : 0) | (raOpen ? 4 : 0);
+        for (const std::string& l : page.lines) s.file = s.file * 131 + std::hash<std::string>()(l);
+        return s;
+    };
     while (!quit)
     {
+        const Shown before = shown();
         SDL_Event e;
         bool any = SDL_WaitEventTimeout(&e, 50);
         while (any)
@@ -1195,7 +1222,11 @@ int PickGame(Folders& fo, std::vector<Launcher::Game>& games, int selected, bool
             }
             any = SDL_PollEvent(&e);
         }
-        if (quit) break;
+        if (quit)
+        {
+            if (result >= 0) MenuSound::Play(MenuSound::DECIDE);
+            break;
+        }
         // Held directions on any controller (the D-pad or the left stick) repeat.
         int dir = 0;
         for (SDL_GameController* p : pads)
@@ -1232,6 +1263,13 @@ int PickGame(Folders& fo, std::vector<Launcher::Game>& games, int selected, bool
         {
             keysCapture = -1;
             keysBuild();
+        }
+        {
+            const Shown after = shown();
+            if (after.file != before.file) soundSettings(); // (MENU SOUNDS or VOLUME may have changed)
+            if (after.windows & ~before.windows) MenuSound::Play(MenuSound::WINDOW);
+            else if (before.windows & ~after.windows) MenuSound::Play(MenuSound::CLOSE);
+            else if (after.where != before.where || after.file != before.file) MenuSound::Play(MenuSound::SELECT);
         }
 
 #ifdef __ANDROID__
@@ -1402,6 +1440,7 @@ int PickGame(Folders& fo, std::vector<Launcher::Game>& games, int selected, bool
     }
     lastTab = tab;
     for (SDL_GameController* p : pads) SDL_GameControllerClose(p);
+    MenuSound::Stop();
     if (texture) SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
