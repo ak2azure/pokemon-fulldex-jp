@@ -106,8 +106,7 @@ inline bool Relaunch(const char* argv0)
         const int s = ConnectLocal(9021);
         if (s >= 0)
         {
-            fprintf(stderr, "[ps5] sending %s to the ELF loader to start the program again for the game list
-",
+            fprintf(stderr, "[ps5] sending %s to the ELF loader to start the program again for the game list\n",
                 starter.c_str());
             fflush(stderr);
             size_t done = 0;
@@ -121,16 +120,13 @@ inline bool Relaunch(const char* argv0)
             if (done == elf.size())
             {
                 for (int i = 0; i < 20; i++) sleep(1);
-                fprintf(stderr, "[ps5] the starter did not start the program again within 20 seconds
-");
+                fprintf(stderr, "[ps5] the starter did not start the program again within 20 seconds\n");
                 return false;
             }
-            fprintf(stderr, "[ps5] the ELF loader did not take all of the starter (%s)
-", strerror(errno));
+            fprintf(stderr, "[ps5] the ELF loader did not take all of the starter (%s)\n", strerror(errno));
         }
         else
-            fprintf(stderr, "[ps5] no ELF loader on port 9021 (%s): trying websrv
-", strerror(errno));
+            fprintf(stderr, "[ps5] no ELF loader on port 9021 (%s): trying websrv\n", strerror(errno));
     }
     std::string path;
     for (unsigned char c : self)
@@ -146,16 +142,11 @@ inline bool Relaunch(const char* argv0)
     const int s = ConnectLocal(8080);
     if (s < 0)
     {
-        fprintf(stderr, "[ps5] websrv is not running (%s): the program ends
-", strerror(errno));
+        fprintf(stderr, "[ps5] websrv is not running (%s): the program ends\n", strerror(errno));
         return false;
     }
-    const std::string req = "GET /hbldr?pipe=0&daemon=0&path=" + path + " HTTP/1.0
-Host: 127.0.0.1
-
-";
-    fprintf(stderr, "[ps5] asking websrv to start %s again for the game list
-", self.c_str());
+    const std::string req = "GET /hbldr?pipe=0&daemon=0&path=" + path + " HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n";
+    fprintf(stderr, "[ps5] asking websrv to start %s again for the game list\n", self.c_str());
     fflush(stderr);
     send(s, req.data(), req.size(), 0);
     // websrv answers only after it has closed this application and started the new one, so an
@@ -165,8 +156,7 @@ Host: 127.0.0.1
     char buf[256];
     const ssize_t n = recv(s, buf, sizeof buf - 1, 0);
     buf[n > 0 ? n : 0] = 0;
-    fprintf(stderr, "[ps5] websrv did not start the program again: %s
-", n > 0 ? buf : "no answer");
+    fprintf(stderr, "[ps5] websrv did not start the program again: %s\n", n > 0 ? buf : "no answer");
     close(s);
     return false;
 }
