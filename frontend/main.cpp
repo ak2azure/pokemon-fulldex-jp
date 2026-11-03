@@ -7944,9 +7944,12 @@ int main(int argc, char** argv)
             audioOut.clear();
             audioStretch.Process(audioBuf.data(), got, slowdown, audioOut);
             // VOLUME: scaled here, after the game's own mixing (silence at OFF, still queued, so
-            // the timing the queue gives stays the same).
-            if (cfg.volume < 100)
-                for (int16_t& v : audioOut) v = (int16_t)(v * cfg.volume / 100);
+            // the timing the queue gives stays the same). The game plays at half the level of
+            // the game list's menu sounds (menusound.h), which the same VOLUME sets: at full
+            // level it was much louder than them.
+            constexpr int GameLevel = 50;
+            const int level = cfg.volume * GameLevel;
+            for (int16_t& v : audioOut) v = (int16_t)(v * level / 10000);
             // Drop audio rather than let latency grow if the queue backs up.
             if (queued < 48000 / 4 && !audioOut.empty())
                 SDL_QueueAudio(audio, audioOut.data(), (Uint32)(audioOut.size() * 2));

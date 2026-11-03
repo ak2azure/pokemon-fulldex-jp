@@ -3,6 +3,8 @@
 
 ## Unreleased
 
+- **The games' sound is half as loud as before**, so that it sits with the game list's menu
+  sounds and music instead of drowning them; SOUND: VOLUME still sets both.
 - **Music in the game list**: put your own song, named music.ogg (Ogg Vorbis) or music.wav, in the
   same folder as background.jpg (beside your saves) and the list plays it over and over under its
   menu sounds, fading out as a game starts. GAME LIST: MUSIC turns it off; SOUND: VOLUME sets its
