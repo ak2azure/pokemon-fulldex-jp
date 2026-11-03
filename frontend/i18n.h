@@ -106,6 +106,15 @@ inline std::string Find(const std::string& s, int depth = 0)
         { "JOINED ", "参加中 ", true },
         { "COULD NOT JOIN ", "参加できません: ", true },
         { " (YOU)", " (自分)", false },
+        { "RETROACHIEVEMENTS: LOGGED IN AS ", "RETROACHIEVEMENTS: ログイン中 ", true },
+        { "RETROACHIEVEMENTS: LOGIN FAILED: ", "RETROACHIEVEMENTS: ログインできません: ", true },
+        { "RETROACHIEVEMENTS: COULD NOT LOAD: ", "RETROACHIEVEMENTS: 読み込めません: ", true },
+        { "USRCHEAT.DAT HAS NO ENTRY FOR THIS GAME CODE: ", "USRCHEAT.DAT にこのゲームコードがありません: ", true },
+        { "ACHIEVEMENT: ", "実績: ", true },
+        { "FOLDER: ", "フォルダー: ", true },
+        { "LOADED: ", "読み込み: ", true },
+        { "FAILED: ", "失敗: ", true },
+        { "FIND: ", "検索: ", true },
     };
     for (const auto& a : affixes)
     {
@@ -113,6 +122,13 @@ inline std::string Find(const std::string& s, int depth = 0)
             return a.ja + part(u.substr(strlen(a.en)));
         if (!a.prefix && EndsWith(u, a.en) && u.size() > strlen(a.en))
             return part(u.substr(0, u.size() - strlen(a.en))) + a.ja;
+    }
+    if (StartsWith(u, "VERSION ") && EndsWith(u, " IS OUT - REBUILD THE APP ON YOUR PC") && u.size() > 44)
+        return "新しいバージョン " + u.substr(8, u.size() - 44) + " があります。PC でアプリを作り直してください";
+    {
+        static const char* restores = ". RESTORES THIS GAME'S SAVE AND RESTARTS IT. CURRENT SAVE KEPT AS BEFORE-RESTORE.SAV.";
+        if (EndsWith(u, restores) && u.size() > strlen(restores))
+            return u.substr(0, u.size() - strlen(restores)) + "。このゲームのセーブをこれに戻して、やり直します。今のセーブは BEFORE-RESTORE.SAV として残します。";
     }
     // A count and a word: "3 ON" (cheats), "12 PTS", "8 CHARACTERS".
     const size_t sp = u.find(' ');

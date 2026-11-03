@@ -3,6 +3,9 @@
 
 ## Unreleased
 
+- **The settings and menus are all in Japanese again**: the descriptions and screens added by the
+  original project (updates, cheats, save backups, shortcuts, RetroAchievements, the newer
+  settings) had stayed in English.
 - **The games' sound is half as loud as before**, so that it sits with the game list's menu
   sounds and music instead of drowning them; SOUND: VOLUME still sets both.
 - **Music in the game list**: put your own song, named music.ogg (Ogg Vorbis) or music.wav, in the
