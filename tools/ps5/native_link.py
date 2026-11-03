@@ -92,7 +92,7 @@ def main():
             # (out.map: which function each address is in, for the crash reports in game.log.)
             "--Map=" + out + ".map",
             "--version-script", os.path.join(native, "app-symbols.map"), "--exclude-libs=ALL",
-            "-e", "_start", "-L", lib, "-o", pie, cfg["crt"], cfg["wraps"]]
+            "-e", "_start", "-L", lib, "-o", pie, cfg["crt"], cfg["wraps"]] + cfg.get("objects", [])
     # Archives may need each other in any order (melonDS's core and the frontend's), so they go
     # in one group, with the platform layer and the C++ runtime.
     link += [x for x in inputs if not x.endswith(".a")]

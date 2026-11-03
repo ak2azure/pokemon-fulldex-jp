@@ -107,6 +107,11 @@ say "The title's start-up code and its links to the platform layer"
     -c "$BP/tooling/native/app_crt.cpp" -o "$WORK/app_crt.o"
 "$PS5_PAYLOAD_SDK/bin/prospero-clang" -std=gnu11 -O2 -Wall -I"$PF/platform/include" \
     -c tools/ps5/native/wraps.c -o "$WORK/wraps.o"
+# (Trace points in RADV's start and any exit or abort, for the program's link: radv_trace.c.)
+"$PS5_PAYLOAD_SDK/bin/prospero-clang" -std=gnu11 -O2 -Wall \
+    -c tools/ps5/native/radv_trace.c -o "$WORK/radv_trace.o"
+TRACES="$(grep -o '^SSR_TRACE([a-z_0-9]*)' tools/ps5/native/radv_trace.c | sed 's/SSR_TRACE(//;s/)//' | tr '\n' ' ')"
+TRACES+="abort exit _Exit"
 # The names linked with --wrap: wraps.c's, and the platform layer's own (the heap, and threads
 # with the main thread's 2 MiB stack instead of a title's 64 KiB).
 WRAPS="$(grep -o '__wrap_[A-Za-z_0-9]*' tools/ps5/native/wraps.c | sed 's/__wrap_//' | sort -u | tr '\n' ' ')"
@@ -131,15 +136,16 @@ SDLWRAPS+=" SDL_DestroyTexture SDL_UpdateTexture SDL_SetTextureBlendMode SDL_Set
 SDLWRAPS+=" SDL_SetTextureAlphaMod SDL_SetRenderDrawColor SDL_SetRenderDrawBlendMode SDL_RenderClear SDL_RenderFillRect"
 SDLWRAPS+=" SDL_RenderFillRects SDL_RenderCopy SDL_RenderCopyF SDL_RenderCopyEx SDL_RenderGeometry SDL_RenderReadPixels"
 SDLWRAPS+=" SDL_RenderPresent"
-python3 - "$WORK" "$WRAPS" "$DEFSYMS" "$SDLWRAPS" "$HERE/$RADV_A" "$BUILTINS" <<EOF
+python3 - "$WORK" "$WRAPS" "$DEFSYMS" "$SDLWRAPS" "$HERE/$RADV_A" "$BUILTINS" "$TRACES" <<EOF
 import json, sys
-work, wraps, defsyms, sdl, radv, builtins = sys.argv[1:7]
+work, wraps, defsyms, sdl, radv, builtins, traces = sys.argv[1:8]
 plain = {"sdk": "$PS5_PAYLOAD_SDK", "boilerplate": "$HERE/$BP", "tool": "$TOOL",
          "platform": "$HERE/$WORK/libps5platform.a", "crt": "$HERE/$WORK/app_crt.o",
          "wraps": "$HERE/$WORK/wraps.o", "wraps_names": wraps.split()}
 json.dump(plain, open(work + "/link-plain.json", "w"), indent=1)
 full = dict(plain, whole=[radv], builtins=builtins, defsyms=defsyms.split(),
-            wraps_names=wraps.split() + ["fclose", "fflush"] + sdl.split())
+            objects=["$HERE/$WORK/radv_trace.o"],
+            wraps_names=wraps.split() + ["fclose", "fflush"] + sdl.split() + traces.split())
 json.dump(full, open(work + "/link.json", "w"), indent=1)
 EOF
 

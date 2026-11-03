@@ -323,7 +323,10 @@ inline void LogCrashes()
     sa.sa_sigaction = Detail::OnCrash;
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
     sigemptyset(&sa.sa_mask);
-    for (const int sig : { SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT }) sigaction(sig, &sa, nullptr);
+    // (SIGSYS too: a system call a title may not make. SIGTRAP: a trap instruction, which some
+    // checks compile to.)
+    for (const int sig : { SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT, SIGSYS, SIGTRAP })
+        sigaction(sig, &sa, nullptr);
     fprintf(stderr, "[ps5] crashes are logged (OnCrash at %p)\n", (void*)&Detail::OnCrash);
 }
 
