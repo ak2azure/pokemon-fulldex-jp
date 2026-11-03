@@ -2073,6 +2073,10 @@ int main(int argc, char** argv)
     cfg.wideGpu = true;
     cfg.frameAhead = true;
     cfg.padTouch = true;
+#elif defined(SSR_PS5)
+    // The PS5 has no touch screen, keyboard or mouse: the stick touch cursor always, as on the
+    // Switch (the right stick moves it, L2 touches; R3 swaps the screens).
+    cfg.padTouch = true;
 #endif
     for (const std::string& kv : opt.sets) cfg.Apply(kv);
     if (!opt.sets.empty() || opt.keepSettings) cfg.readOnly = true;
@@ -5057,8 +5061,8 @@ int main(int argc, char** argv)
             // (Nothing to choose on the Switch: its labels are the DS's positions.)
             add(M_BUTTONS, "BUTTONS", cfg.byLabel ? "BY LABEL" : "BY POSITION");
 #endif
-#if !defined(__SWITCH__) && !defined(SSR_PHONE)
-            add(M_PADTOUCH, "STICK TOUCH CURSOR", onOff(cfg.padTouch)); // (the Switch and phones have touch screens)
+#if !defined(__SWITCH__) && !defined(SSR_PHONE) && !defined(SSR_PS5)
+            add(M_PADTOUCH, "STICK TOUCH CURSOR", onOff(cfg.padTouch)); // (the Switch and phones have touch screens; the PS5 always has it)
 #endif
             add(M_BACK, "BACK", "");
         }
@@ -6797,8 +6801,9 @@ int main(int argc, char** argv)
             if (cfg.padTouch)
             {
                 if (pressed(PAD_RS)) focus.manualFlip = !focus.manualFlip;
-#ifndef __SWITCH__
-                // (Not on the Switch: a left stick pressed while walking would change the view.)
+#if !defined(__SWITCH__) && !defined(SSR_PS5)
+                // (Not on the Switch or the PS5, where the cursor is always on: a left stick
+                // pressed while walking would change the view.)
                 if (pressed(PAD_LS)) layout = LayoutNext(layout);
 #endif
                 if (fabsf(ps.rx) > 0.2f) curDX += ps.rx;

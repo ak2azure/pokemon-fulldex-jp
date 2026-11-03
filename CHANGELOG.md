@@ -9,6 +9,9 @@
   on the JIT, and the picture is drawn by the graphics chip at the screen's own resolution (4K on
   a 4K TV), with WORLD ON GPU, through Vulkan; if that cannot start, the processor draws it at
   1920x1080.
+- **PS5: the touch screen from the controller**, as on the Switch: the right stick moves a
+  cursor over the touch screen and L2 touches (R3 swaps the screens). Always on: the PS5 has no
+  touch screen.
 - **60 FPS in-between frames: no more trees and ground breaking up every other frame** when
   the camera moves through a town (Black and White's Striaton City: the trees turned into flat
   blobs, or the ground and trees were drawn twice their size over a building and the people).

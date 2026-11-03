@@ -944,7 +944,7 @@ inline std::vector<Setting> SettingsList()
 #ifndef __SWITCH__
     l.push_back({ "buttons", "BUTTONS", { { "labels", "BY LABEL" }, { "positions", "BY POSITION" } }, "labels",
                   "BY LABEL: THE BUTTON MARKED A IS THE DS A ON ANY CONTROLLER. BY POSITION: THE BUTTONS WHERE A DS HAS THEM (XBOX A IS DS B)." });
-#ifndef SSR_PHONE
+#if !defined(SSR_PHONE) && !defined(SSR_PS5) // (always on on the PS5: main.cpp)
     l.push_back({ "pad_touch", "STICK TOUCH CURSOR", onOff, "0", "ON: THE RIGHT STICK MOVES A CURSOR ON THE TOUCH SCREEN AND THE LEFT TRIGGER PRESSES IT." });
     // (frontend/shortcuts.h, made by the game list: pc_launcher.cpp. Not on a Mac: its Dock and
     // Launchpad start the app itself.)
