@@ -971,7 +971,7 @@ inline std::vector<Setting> SettingsList()
     l.push_back({ "list_sounds", "MENU SOUNDS", onOff, "1",
                   "ON: THIS LIST PLAYS HEARTGOLD AND SOULSILVER'S MENU SOUNDS, TAKEN FROM YOUR OWN ROM OF EITHER IN THE LIST (AT THE VOLUME SET IN SOUND)." });
     l.push_back({ "list_music", "MUSIC", onOff, "1",
-                  "ON: THIS LIST PLAYS YOUR OWN SONG OVER AND OVER: PUT AN OGG VORBIS OR WAV FILE NAMED MUSIC.OGG OR MUSIC.WAV WHERE BACKGROUND.JPG GOES (WITH YOUR SAVES)." });
+                  "ON: THIS LIST PLAYS YOUR OWN SONG OVER AND OVER: PUT AN OGG VORBIS OR WAV FILE NAMED MUSIC.OGG OR MUSIC.WAV WHERE BACKGROUND.JPG GOES (WITH YOUR SAVES), OR SEVERAL IN A FOLDER NAMED MUSIC THERE, PLAYED IN TURN BY NAME. AN OGG FILE'S LOOPSTART AND LOOPLENGTH TAGS ARE ITS LOOP." });
     l.push_back({ "list_colour", "COLOUR", { { "red", "RED" }, { "blue", "BLUE" }, { "green", "GREEN" }, { "purple", "PURPLE" },
                   { "gold", "GOLD" }, { "pink", "PINK" }, { "teal", "TEAL" } }, "red",
                   "THE GAME LIST'S COLOUR: ITS LINES, THE FRAME ROUND THE CHOSEN GAME AND THE TABS." });

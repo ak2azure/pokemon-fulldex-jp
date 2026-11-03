@@ -9,7 +9,9 @@
   same folder as background.jpg (beside your saves) and the list plays it over and over under its
   menu sounds, fading out as a game starts. GAME LIST: MUSIC turns it off; SOUND: VOLUME sets its
   level. No music comes with the program. An Ogg file with LOOPSTART and LOOPLENGTH (or LOOPEND)
-  tags, in samples, loops between them, as ripped game music often does.
+  tags, in samples, loops between them, as ripped game music often does. Several songs: put them
+  in a folder named music there instead. They play in turn by name, each moving straight on to
+  the next one's loop start at the end of its own loop.
 - **PS5: a test version that is a title of its own** (PKFD00002, "Pokémon Fulldex Native"): it
   starts straight from its Home screen tile like any game, with no ELF loader or websrv, and the
   PS button goes to the Home screen and back. It asks etaHEN for /data as it starts. The games run
