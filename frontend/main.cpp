@@ -5157,13 +5157,9 @@ int main(int argc, char** argv)
     std::vector<int16_t> audioOut;
     uint64_t audioTick = 0;
     double audioSlow = 1.0;
-    // Sound generated while fast forwarding, not yet played. Playback stays at the DS's
-    // own rate (below); this holds the rest. ffAudioAt is the index of the next unplayed
-    // sample (stereo, so two entries per frame).
-    std::vector<int16_t> ffAudio;
-    int ffAudioAt = 0;
-    double ffAudioFrac = 0;
-    bool ffInBattle = false;
+    // The sound while fast forwarding: all of it, played faster at its own pitch (below).
+    AudioStretch ffStretch;
+    std::vector<int16_t> ffOut;
     bool running = true;
     bool mouseDown = false;
     int mouseX = 0, mouseY = 0;
@@ -7898,60 +7894,34 @@ int main(int argc, char** argv)
         }
 
         // Fast forward runs several DS frames in one go, and each one produces a frame of
-        // sound. Playing all of it in that one moment would rush the music; keeping a single
-        // slice and throwing the rest away makes the song skip ahead. Keep every sample and
-        // hand the device one frame's worth per wall-clock frame, so the music stays at its
-        // normal speed while the picture runs ahead. The queue holds up to half a minute
-        // of sound so a long fast forward cannot store the whole song. Past that, further
-        // sound is left out; once what is queued has played, playback takes up from where
-        // the game is now. Letting go throws the queue away, so the music lines up with
-        // the game at once instead of lagging on. A battle has its own music: when one
-        // starts or ends, the queue is dropped so that track starts with the battle
-        // instead of waiting behind whatever was playing before it.
-        const bool inBattle = std::strncmp(scene.name, "battle", 6) == 0;
-        if (speed > 1 && inBattle != ffInBattle && (ffAudioAt != 0 || !ffAudio.empty()))
+        // sound. All of it is played, in the time of the frame shown (AudioStretch::Squeeze):
+        // the music runs ahead with the game, at its own pitch, and goes on from where the game
+        // is when it is let go. (The original project kept the music at its normal speed instead,
+        // leaving sound out once half a minute was waiting and throwing the rest away on letting
+        // go: the music jumped.) Steered, as the stretching below, towards 100 ms of sound
+        // waiting in the queue.
+        if (speed > 1 && got > 0)
         {
-            ffAudio.clear();
-            ffAudioAt = 0;
-            ffAudioFrac = 0;
-            if (audio) SDL_ClearQueuedAudio(audio);
+            const int queued = audio ? (int)SDL_GetQueuedAudioSize(audio) / 4 : 4800;
+            const double want = 48000.0 * frameTime * (1.0 + 0.5 * (4800 - queued) / 4800.0);
+            ffOut.clear();
+            ffStretch.Squeeze(audioBuf.data(), got, want / got, ffOut);
+            got = (int)ffOut.size() / 2;
+            if ((int)audioBuf.size() < got * 2) audioBuf.resize((size_t)got * 2);
+            std::copy(ffOut.begin(), ffOut.end(), audioBuf.begin());
         }
-        ffInBattle = inBattle;
-        if (speed > 1)
+        else if (speed == 1 && ffStretch.Stretching())
         {
-            const int cap = 48000 * 30;
-            int have = ((int)ffAudio.size() - ffAudioAt) / 2;
-            if (have <= 0)
+            // (Let go: what the last pieces had not used yet, before this frame's sound.)
+            ffOut.clear();
+            ffStretch.End(ffOut);
+            if (!ffOut.empty())
             {
-                ffAudio.clear();
-                ffAudioAt = 0;
-                have = 0;
+                ffOut.insert(ffOut.end(), audioBuf.begin(), audioBuf.begin() + (size_t)got * 2);
+                got = (int)ffOut.size() / 2;
+                if ((int)audioBuf.size() < got * 2) audioBuf.resize((size_t)got * 2);
+                std::copy(ffOut.begin(), ffOut.end(), audioBuf.begin());
             }
-            if (got > 0 && (have == 0 || have + got <= cap))
-                ffAudio.insert(ffAudio.end(), audioBuf.begin(), audioBuf.begin() + (size_t)got * 2);
-            ffAudioFrac += 48000.0 * frameTime;
-            int take = (int)ffAudioFrac;
-            ffAudioFrac -= take;
-            have = ((int)ffAudio.size() - ffAudioAt) / 2;
-            if (take > have) take = have;
-            if (take > 0)
-            {
-                std::copy(ffAudio.begin() + ffAudioAt, ffAudio.begin() + ffAudioAt + (size_t)take * 2, audioBuf.begin());
-                ffAudioAt += take * 2;
-                if (ffAudioAt >= 8192)
-                {
-                    ffAudio.erase(ffAudio.begin(), ffAudio.begin() + ffAudioAt);
-                    ffAudioAt = 0;
-                }
-            }
-            got = take;
-        }
-        else if (ffAudioAt != 0 || !ffAudio.empty())
-        {
-            ffAudio.clear();
-            ffAudioAt = 0;
-            ffAudioFrac = 0;
-            if (audio) SDL_ClearQueuedAudio(audio);
         }
 
         if (audio && got > 0)

@@ -59,6 +59,34 @@ public:
 
     bool Stretching() const { return Active; }
 
+    // Fast forward: the sound of several frames played in the time of fewer, at its own pitch
+    // (ratio: the output's length over the input's, below 1), the same way pieces are put
+    // together, only stepping through the input faster than the output. Nothing is left out,
+    // so the music runs ahead with the game and goes on from there when it is let go. Its own
+    // object, apart from the one that stretches; End when fast forward stops.
+    void Squeeze(const int16_t* in, int n, double ratio, std::vector<int16_t>& out)
+    {
+        if (!Active)
+        {
+            Active = true;
+            Buf.clear();
+            Prev = -H;
+            Pos = 0;
+            CalmFrames = 0;
+        }
+        Buf.insert(Buf.end(), in, in + n * 2);
+        Run(std::min(std::max(ratio, 0.2), 1.0), out);
+    }
+    // The rest of the input after the last piece, as it is (Squeeze's end).
+    void End(std::vector<int16_t>& out)
+    {
+        if (!Active) return;
+        const int from = Prev + H;
+        if (from >= 0 && from * 2 < (int)Buf.size()) out.insert(out.end(), Buf.begin() + from * 2, Buf.end());
+        Buf.clear();
+        Active = false;
+    }
+
 private:
     static constexpr int W = 1024;       // piece length (21 ms at 48 kHz)
     static constexpr int H = W / 2;      // output step: pieces overlap by half
