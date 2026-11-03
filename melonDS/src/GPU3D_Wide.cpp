@@ -515,6 +515,41 @@ struct WideAccess
         out.SceneX = sceneVerts ? sceneSum[0] / sceneVerts : 0;
         out.SceneY = sceneVerts ? sceneSum[1] / sceneVerts : 0;
         out.SceneW = sceneVerts ? sceneSum[2] / sceneVerts : 0;
+        // The mean is the camera's movement only when the pairs agree on it (the camera slid,
+        // as running past Black's rocks). When they do not (the camera turned, or a few wrong
+        // pairs far off make the mean), an unpaired polygon moved by it went far off: in White,
+        // walking with Bianca, the ground and trees were drawn twice their size over a building
+        // and the people on every in-between frame. Then the unpaired are left where they
+        // are, as before that correction.
+        if (sceneVerts)
+        {
+            s64 spread[3] = { 0, 0, 0 };
+            for (size_t ci = 0; ci < rawCur.size(); ci++)
+            {
+                if (out.Partner[ci] < 0) continue;
+                const RawPolygon& cur = rawCur[ci];
+                const RawPolygon& prev = rawPrev[out.Partner[ci]];
+                const int nverts = (cur.PolygonMode & 0x1) ? 4 : 3;
+                const s64 mean[3] = { out.SceneX, out.SceneY, out.SceneW };
+                for (int i = 0; i < nverts; i++)
+                    for (int c = 0; c < 3; c++)
+                    {
+                        const int p = c == 2 ? 3 : c;
+                        spread[c] += std::abs((s64)cur.Vertices[i].Position[p] - prev.Vertices[i].Position[p] - mean[c]);
+                    }
+            }
+            // (Within a quarter of the movement itself, or a 256th of the scene's typical depth:
+            // a slide leaves only the pairs' own small motions.)
+            const s64 mean[3] = { out.SceneX, out.SceneY, out.SceneW };
+            bool alike = true;
+            for (int c = 0; c < 3; c++)
+                if (spread[c] / sceneVerts > std::abs(mean[c]) / 4 + ref / 256) alike = false;
+            if (!alike) out.SceneX = out.SceneY = out.SceneW = 0;
+            if (dbgPair)
+                fprintf(stderr, "[pair] scene %lld,%lld,%lld spread %lld,%lld,%lld: %s\n", (long long)mean[0], (long long)mean[1],
+                    (long long)mean[2], (long long)(spread[0] / sceneVerts), (long long)(spread[1] / sceneVerts),
+                    (long long)(spread[2] / sceneVerts), alike ? "slid" : "not a slide, unpaired left as they are");
+        }
     }
 
     // Submits the recorded frame again into the given buffers. With `interpolate`, every
@@ -623,7 +658,13 @@ struct WideAccess
                         }
                     }
                 }
-                else if (pr->SceneX || pr->SceneY || pr->SceneW)
+                else if ((pr->SceneX || pr->SceneY || pr->SceneW) && [&] {
+                             // (Not where half the depth's movement is a large part of a corner's
+                             // depth: the polygon would be thrown about, or behind the camera.)
+                             for (int i = 0; i < nverts; i++)
+                                 if (std::abs(pr->SceneW / 2) * 4 > std::abs((s64)cur.Vertices[i].Position[3])) return false;
+                             return true;
+                         }())
                 {
                     // Unpaired: moved back by half the scene's movement, as its paired neighbours
                     // are. Left at its new position it stood apart from them by half the camera's
