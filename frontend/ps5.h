@@ -267,9 +267,15 @@ inline void StartPicture()
     //
     // A start that never finishes leaves a mark behind (the console closes the title), and the
     // next start of the same build draws with the processor instead of stopping again. A new
-    // build tries Vulkan again; so does deleting the mark.
+    // build tries Vulkan again; so does deleting the mark. (A build is told by its eboot.bin's
+    // size and time: __DATE__ and __TIME__ here are those of whichever file was compiled last
+    // that includes this one, and a build that recompiled only another kept the old mark.)
     const char* mark = "/data/pokemon-ds-wide/vulkan-starting";
-    const std::string build = __DATE__ " " __TIME__;
+    std::string build = __DATE__ " " __TIME__;
+    struct stat self;
+    if (stat("/app0/eboot.bin", &self) == 0)
+        build = "eboot.bin " + std::to_string((long long)self.st_size) + " " +
+                std::to_string((long long)self.st_mtime);
     if (FILE* f = fopen(mark, "rb"))
     {
         char was[64] = {};
