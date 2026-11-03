@@ -16,6 +16,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <cstdlib>
 #include <mutex>
 #include <thread>
 #include <pthread.h>
@@ -247,9 +248,9 @@ inline void ShowStack(const uint64_t* sp)
     }
 }
 
-inline void OnCrash(int sig, siginfo_t* info, void*)
+inline void OnCrash(int sig, siginfo_t* info, void* context)
 {
-    char line[160];
+    char line[256];
     char* p = line;
     const char* head = "\n[ps5] CRASH: signal ";
     memcpy(p, head, strlen(head));
@@ -264,10 +265,20 @@ inline void OnCrash(int sig, siginfo_t* info, void*)
     memcpy(p, here, strlen(here));
     p += strlen(here);
     Hex(p, (uint64_t)(uintptr_t)&OnCrash);
+    const mcontext_t& m = static_cast<ucontext_t*>(context)->uc_mcontext;
+    const char* rip = "; instruction ";
+    memcpy(p, rip, strlen(rip));
+    p += strlen(rip);
+    Hex(p, (uint64_t)m.mc_rip);
+    const char* rsp = ", stack ";
+    memcpy(p, rsp, strlen(rsp));
+    p += strlen(rsp);
+    Hex(p, (uint64_t)m.mc_rsp);
     *p++ = '\n';
     write(2, line, (size_t)(p - line));
-    uint64_t local = 0;
-    ShowStack(&local);
+    // (The handler runs on a stack of its own, CrashStack, so that an overflow is reported too:
+    // the crashed thread's stack is the one at the time of the fault.)
+    ShowStack(reinterpret_cast<const uint64_t*>(m.mc_rsp));
     Put("[ps5] end of the crash report\n");
     signal(sig, SIG_DFL);
     raise(sig);
@@ -291,12 +302,26 @@ inline void OnWhere(int, siginfo_t*, void* context)
 }
 }
 
+// A stack for the crash report of the calling thread, apart from its own: a thread that runs
+// out of stack would otherwise die without a word (the handler would need the stack that is
+// gone). Each thread that should report an overflow calls it once.
+inline void CrashStack()
+{
+    const size_t bytes = 256 * 1024;
+    stack_t ss;
+    memset(&ss, 0, sizeof ss);
+    ss.ss_sp = malloc(bytes);
+    ss.ss_size = bytes;
+    if (ss.ss_sp) sigaltstack(&ss, nullptr);
+}
+
 inline void LogCrashes()
 {
+    CrashStack();
     struct sigaction sa;
     memset(&sa, 0, sizeof sa);
     sa.sa_sigaction = Detail::OnCrash;
-    sa.sa_flags = SA_SIGINFO;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
     sigemptyset(&sa.sa_mask);
     for (const int sig : { SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT }) sigaction(sig, &sa, nullptr);
     fprintf(stderr, "[ps5] crashes are logged (OnCrash at %p)\n", (void*)&Detail::OnCrash);
@@ -305,10 +330,13 @@ inline void LogCrashes()
 // A watch over a step that might never finish (the graphics chip's start, which once stopped
 // inside RADV with nothing in the log): if the thread that made it is still in the step after
 // the given time, the log says so and where that thread is (Detail::OnWhere, through SIGUSR1).
+// Until then it writes a line each second, so that a log that ends between them shows the
+// title was closed rather than stuck.
 class Watch
 {
 public:
-    Watch(const char* what, int seconds) : What(what), Seconds(seconds), Target(pthread_self())
+    Watch(const char* what, int seconds, pthread_t target)
+        : What(what), Seconds(seconds), Target(target)
     {
         struct sigaction sa;
         memset(&sa, 0, sizeof sa);
@@ -332,11 +360,15 @@ private:
     void Run()
     {
         std::unique_lock<std::mutex> lock(Lock);
-        for (int reported = 0; !Done && reported < 3; reported++)
+        for (int s = 1; s <= 3 * Seconds; s++)
         {
-            if (Wake.wait_for(lock, std::chrono::seconds(Seconds), [this] { return Done; })) break;
-            fprintf(stderr, "[ps5] %s has not finished after %d s; where it is:\n", What,
-                    Seconds * (reported + 1));
+            if (Wake.wait_for(lock, std::chrono::seconds(1), [this] { return Done; })) break;
+            if (s % Seconds)
+            {
+                if (s < Seconds) fprintf(stderr, "[ps5] %s: %d s\n", What, s);
+                continue;
+            }
+            fprintf(stderr, "[ps5] %s has not finished after %d s; where it is:\n", What, s);
             pthread_kill(Target, SIGUSR1);
         }
     }
@@ -349,6 +381,44 @@ private:
     bool Done = false;
     std::thread Thread;
 };
+
+// A step run on a thread of its own with a large stack (16 MB, from the heap: libkernel may
+// cap a size that is only asked for), watched as above, while the calling thread waits for it.
+// For the graphics chip's start, in case RADV's runs deeper than the title's main thread's
+// stack allows.
+template <typename F> void RunWatched(const char* what, int seconds, F step)
+{
+    struct Job
+    {
+        F* Step;
+        static void* Run(void* self)
+        {
+            CrashStack();
+            (*static_cast<Job*>(self)->Step)();
+            return nullptr;
+        }
+    } job { &step };
+    const size_t bytes = 16 << 20;
+    void* stack = aligned_alloc(16384, bytes);
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_t thread;
+    if (!stack || pthread_attr_setstack(&attr, stack, bytes) != 0 ||
+        pthread_create(&thread, &attr, &Job::Run, &job) != 0)
+    {
+        fprintf(stderr, "[ps5] no thread for %s: run here\n", what);
+        pthread_attr_destroy(&attr);
+        free(stack);
+        step();
+        return;
+    }
+    pthread_attr_destroy(&attr);
+    {
+        Watch watch(what, seconds, thread);
+        pthread_join(thread, nullptr);
+    }
+    free(stack);
+}
 
 // A notice for when there is no /data: written where a title can always write, its
 // /download0, since game.log has no folder to go in.

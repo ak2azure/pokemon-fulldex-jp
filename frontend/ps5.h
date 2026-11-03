@@ -289,13 +289,13 @@ inline void StartPicture()
         fclose(f);
     }
     std::string info;
-    bool started;
-    {
+    bool started = false;
 #ifdef SSR_PS5_NATIVE
-        Ps5Native::Watch watch("the graphics chip's start (Vulkan)", 10);
+    Ps5Native::RunWatched("the graphics chip's start (Vulkan)", 10,
+                          [&] { started = VkRender::Start(info, true); });
+#else
+    started = VkRender::Start(info, true);
 #endif
-        started = VkRender::Start(info, true);
-    }
     remove(mark);
     if (started)
     {
