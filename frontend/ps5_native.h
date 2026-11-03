@@ -248,6 +248,18 @@ inline void ShowStack(const uint64_t* sp)
     }
 }
 
+// A register of the interrupted thread. The console's ucontext_t has 48 bytes before
+// uc_mcontext that FreeBSD's, and the payload SDK's header, do not: the machine context is at
+// byte 64 (Mihawk's SDK fork, platform/include/ps5platform/context.h). Read through the SDK's
+// header, mc_rip was r14 and mc_rsp the fault address. The machine context itself is laid out
+// as FreeBSD's.
+inline uint64_t Register(const void* context, size_t offset)
+{
+    uint64_t v;
+    memcpy(&v, static_cast<const char*>(context) + 64 + offset, sizeof v);
+    return v;
+}
+
 inline void OnCrash(int sig, siginfo_t* info, void* context)
 {
     char line[256];
@@ -265,20 +277,21 @@ inline void OnCrash(int sig, siginfo_t* info, void* context)
     memcpy(p, here, strlen(here));
     p += strlen(here);
     Hex(p, (uint64_t)(uintptr_t)&OnCrash);
-    const mcontext_t& m = static_cast<ucontext_t*>(context)->uc_mcontext;
-    const char* rip = "; instruction ";
-    memcpy(p, rip, strlen(rip));
-    p += strlen(rip);
-    Hex(p, (uint64_t)m.mc_rip);
-    const char* rsp = ", stack ";
-    memcpy(p, rsp, strlen(rsp));
-    p += strlen(rsp);
-    Hex(p, (uint64_t)m.mc_rsp);
+    const uint64_t rip = Register(context, offsetof(mcontext_t, mc_rip));
+    const uint64_t rsp = Register(context, offsetof(mcontext_t, mc_rsp));
+    const char* ripText = "; instruction ";
+    memcpy(p, ripText, strlen(ripText));
+    p += strlen(ripText);
+    Hex(p, rip);
+    const char* rspText = ", stack ";
+    memcpy(p, rspText, strlen(rspText));
+    p += strlen(rspText);
+    Hex(p, rsp);
     *p++ = '\n';
     write(fileno(stderr), line, (size_t)(p - line));
     // (The handler runs on a stack of its own, CrashStack, so that an overflow is reported too:
     // the crashed thread's stack is the one at the time of the fault.)
-    ShowStack(reinterpret_cast<const uint64_t*>(m.mc_rsp));
+    ShowStack(reinterpret_cast<const uint64_t*>(rsp));
     Put("[ps5] end of the crash report\n");
     signal(sig, SIG_DFL);
     raise(sig);
@@ -288,16 +301,15 @@ inline void OnCrash(int sig, siginfo_t* info, void* context)
 // at, then the return addresses on its stack, as for a crash.
 inline void OnWhere(int, siginfo_t*, void* context)
 {
-    const mcontext_t& m = static_cast<ucontext_t*>(context)->uc_mcontext;
     char line[64];
     char* p = line;
     const char* head = "[ps5] it is at ";
     memcpy(p, head, strlen(head));
     p += strlen(head);
-    Hex(p, (uint64_t)m.mc_rip);
+    Hex(p, Register(context, offsetof(mcontext_t, mc_rip)));
     *p++ = '\n';
     write(fileno(stderr), line, (size_t)(p - line));
-    ShowStack(reinterpret_cast<const uint64_t*>(m.mc_rsp));
+    ShowStack(reinterpret_cast<const uint64_t*>(Register(context, offsetof(mcontext_t, mc_rsp))));
     Put("[ps5] end of the report\n");
 }
 }
