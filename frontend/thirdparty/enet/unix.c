@@ -305,6 +305,12 @@ enet_socket_set_option (ENetSocket socket, ENetSocketOption option, int value)
         case ENET_SOCKOPT_NONBLOCK:
 #ifdef HAS_FCNTL
             result = fcntl (socket, F_SETFL, (value ? O_NONBLOCK : 0) | (fcntl (socket, F_GETFL) & ~O_NONBLOCK));
+#ifdef __PROSPERO__
+            /* ssrecomp: on the PS5 fcntl's O_NONBLOCK does not take for a socket (Porpoise's
+               porpoise_netfs.cpp found the same): the console's own option, SO_NBIO. Without it
+               the first read after HOST waited for a packet that never came (LAN PLAY froze). */
+            result = setsockopt (socket, SOL_SOCKET, 0x1200, (char *) & value, sizeof (int));
+#endif
 #else
             result = ioctl (socket, FIONBIO, & value);
 #endif

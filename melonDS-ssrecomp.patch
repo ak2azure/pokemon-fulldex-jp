@@ -3222,3 +3222,31 @@ index 3c4aca7..7106495 100644
      s32 left = 0, right = 0;
      s32 leftoutput = 0, rightoutput = 0;
  
+diff --git a/src/net/LAN.cpp b/src/net/LAN.cpp
+index 78b5f50..0723675 100644
+--- a/src/net/LAN.cpp
++++ b/src/net/LAN.cpp
+@@ -200,6 +200,13 @@ bool LAN::StartDiscovery()
+         return false;
+     }
+ 
++#ifdef __PROSPERO__
++    // (ssrecomp: on the PS5 a socket that is read with nothing waiting would wait, and select
++    // there is not to be relied on: non-blocking by the console's own option, SO_NBIO, as
++    // fcntl's O_NONBLOCK does not take there; see ENet's unix.c.)
++    setsockopt(DiscoverySocket, SOL_SOCKET, 0x1200, (const char*)&opt_true, sizeof(int));
++#endif
++
+     DiscoveryLastTick = (u32)Platform::GetMSCount();
+     DiscoveryList.clear();
+ 
+@@ -446,7 +453,8 @@ void LAN::ProcessDiscovery()
+         {
+             FD_ZERO(&fd); FD_SET(DiscoverySocket, &fd);
+             tv.tv_sec = 0; tv.tv_usec = 0;
+-            if (!select(DiscoverySocket+1, &fd, nullptr, nullptr, &tv))
++            // (ssrecomp: an error, -1, ends it too, as nothing waits: it went round for ever.)
++            if (select(DiscoverySocket+1, &fd, nullptr, nullptr, &tv) <= 0)
+                 break;
+ 
+             DiscoveryData beacon;

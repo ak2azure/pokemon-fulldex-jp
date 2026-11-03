@@ -9,6 +9,8 @@
   on the JIT, and the picture is drawn by the graphics chip at the screen's own resolution (4K on
   a 4K TV), with WORLD ON GPU, through Vulkan; if that cannot start, the processor draws it at
   1920x1080.
+- **PS5: LAN PLAY's HOST no longer freezes the game.** (Its network connection waited for a
+  message that never came.)
 - **Fast forward speeds the sound up with the game** (at its own pitch), instead of keeping the
   music at its normal speed and then jumping ahead when fast forward is let go.
 - **PS5: the touch screen from the controller**, as on the Switch: the right stick moves a
