@@ -171,14 +171,14 @@ if(ANDROID)
     # PC program (frontend/pc_launcher.cpp) with the ROMs in a folder the player chooses.
     option(SSR_PC_ALL_GAMES "The all-games program with its game list" OFF)
     if(SSR_PC_ALL_GAMES)
-        target_sources(ssrecomp PRIVATE frontend/pc_launcher.cpp)
+        target_sources(ssrecomp PRIVATE frontend/pc_launcher.cpp frontend/thirdparty/stb_vorbis.c)
         target_compile_definitions(ssrecomp PRIVATE SSR_PC_LAUNCHER)
     endif()
 elseif(SSR_SWITCH)
     # On the Switch the game is an .nro, a program for the Homebrew Menu, made from the
     # executable below. Like the Android app it holds the player's own game, so it is built
     # on the player's PC and never shared. No libpng: screenshots are a desktop test aid.
-    add_executable(ssrecomp ${SSRECOMP_SOURCES} frontend/switch_platform.cpp)
+    add_executable(ssrecomp ${SSRECOMP_SOURCES} frontend/switch_platform.cpp frontend/thirdparty/stb_vorbis.c)
     # main.cpp includes <SDL2/SDL.h>, so the folder above SDL2's own is needed too.
     pkg_get_variable(SDL2_INCLUDEDIR sdl2 includedir)
     target_include_directories(ssrecomp PRIVATE melonDS/src frontend runtime "${SSR_GENERATED_DIR}" "${SDL2_INCLUDEDIR}" ${SDL2_STATIC_INCLUDE_DIRS})
@@ -345,7 +345,7 @@ else()
     # arguments (frontend/pc_launcher.cpp), with the ROMs in the roms folder beside it.
     option(SSR_PC_ALL_GAMES "The PC all-games program with its game list" OFF)
     if(SSR_PC_ALL_GAMES)
-        target_sources(ssrecomp PRIVATE frontend/pc_launcher.cpp)
+        target_sources(ssrecomp PRIVATE frontend/pc_launcher.cpp frontend/thirdparty/stb_vorbis.c)
         target_compile_definitions(ssrecomp PRIVATE SSR_PC_LAUNCHER)
         # Updates from the game list (frontend/updater.cpp). The time of building tells a
         # download with no record of what was installed from a newer release (only this one file

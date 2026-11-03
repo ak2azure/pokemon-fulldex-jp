@@ -303,7 +303,8 @@ int PickGame(const std::vector<Launcher::Game>& games, int selected, const std::
         (void)key;
 #endif
     };
-    // HeartGold and SoulSilver's menu sounds (menusound.h, from one of their ROMs in the list), on
+    // HeartGold and SoulSilver's menu sounds (menusound.h, from one of their ROMs in the list) and
+    // the player's own music (music.ogg or .wav in this folder), on
     // SDL's audio while the list is up: as pc_launcher.cpp, each pass compares what the list
     // shows before and after it. The game chosen: the choice's sound; a window opened (the
     // settings, KEYS AND BUTTONS) or closed: the window's; anything else: the cursor's.
@@ -312,7 +313,8 @@ int PickGame(const std::vector<Launcher::Game>& games, int selected, const std::
         for (const Launcher::Game& g : games) roms.push_back({ g.code, g.rom });
         const std::string volume = Launcher::ConfigValue(cfgPath, "volume");
         MenuSound::Start(roms, autoFrames == 0 && Launcher::ConfigValue(cfgPath, "list_sounds") != "0",
-            volume.empty() ? 100 : atoi(volume.c_str()));
+            volume.empty() ? 100 : atoi(volume.c_str()), listDir,
+            autoFrames == 0 && Launcher::ConfigValue(cfgPath, "list_music") != "0");
     };
     soundSettings();
     struct Shown

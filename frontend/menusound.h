@@ -5,8 +5,10 @@
 // game is in this program. Each is read from the ROM's sound archive (data/sound/
 // gs_sound_data.sdat: the sequence, its instrument bank and wave archive) and played through
 // once, as the DS's sound driver would, into a stereo buffer at the output's rate; the list then
-// plays those buffers (SDL's audio queue). Without a HeartGold or SoulSilver ROM the list is
-// silent, as before.
+// plays those buffers. Without a HeartGold or SoulSilver ROM there are no menu sounds.
+//
+// The list's music: the player's own song (music.ogg or music.wav beside the saves, GAME LIST:
+// MUSIC), played over and over under the menu sounds while the list is up. Nothing is built in.
 //
 // Only what these short sequences use is played: notes and rests, the track's volume, expression,
 // pan, transposition and pitch bend, the instrument's envelope (or the track's own), several
@@ -28,6 +30,10 @@
 #include <deque>
 #include <string>
 #include <vector>
+
+// (Compiled on its own, frontend/thirdparty/stb_vorbis.c: its macros would clash with ours.)
+#define STB_VORBIS_HEADER_ONLY
+#include "thirdparty/stb_vorbis.c"
 
 namespace MenuSound
 {
@@ -636,20 +642,182 @@ private:
     }
 };
 
-// The sounds and the device that plays them.
+// The player's song, read from its file and played round and round: decoded a little at a
+// time (Ogg Vorbis) or all at once (WAV), and changed to the output's rate and two channels.
+struct Music
+{
+    std::vector<unsigned char> file; // (the Ogg file, which stb_vorbis reads from memory)
+    stb_vorbis* ogg = nullptr;
+    std::vector<int16_t> wav;
+    size_t wavAt = 0;
+    int channels = 0;
+    SDL_AudioStream* stream = nullptr;
+    std::string from;
+
+    ~Music() { Close(); }
+    void Close()
+    {
+        if (ogg) stb_vorbis_close(ogg);
+        if (stream) SDL_FreeAudioStream(stream);
+        ogg = nullptr;
+        stream = nullptr;
+        file.clear();
+        wav.clear();
+        wavAt = 0;
+        from.clear();
+    }
+    bool Open(const std::string& path, int rate)
+    {
+        Close();
+        FILE* f = fopen(path.c_str(), "rb");
+        if (!f) return false;
+        fseek(f, 0, SEEK_END);
+        const long size = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        // (At most 64 MB: a WAV of six minutes.)
+        if (size > 0 && size <= (64 << 20))
+        {
+            file.resize((size_t)size);
+            if (fread(file.data(), 1, file.size(), f) != file.size()) file.clear();
+        }
+        fclose(f);
+        if (file.empty()) return false;
+        int fileRate = 0;
+        if (file.size() > 4 && !memcmp(file.data(), "OggS", 4))
+        {
+            int error = 0;
+            ogg = stb_vorbis_open_memory(file.data(), (int)file.size(), &error, nullptr);
+            if (!ogg)
+            {
+                fprintf(stderr, "[music] %s: not an Ogg Vorbis file this can read (%d)\n", path.c_str(), error);
+                Close();
+                return false;
+            }
+            const stb_vorbis_info info = stb_vorbis_get_info(ogg);
+            channels = info.channels;
+            fileRate = (int)info.sample_rate;
+        }
+        else
+        {
+            SDL_AudioSpec spec = {};
+            Uint8* data = nullptr;
+            Uint32 bytes = 0;
+            if (!SDL_LoadWAV_RW(SDL_RWFromConstMem(file.data(), (int)file.size()), 1, &spec, &data, &bytes))
+            {
+                fprintf(stderr, "[music] %s: %s\n", path.c_str(), SDL_GetError());
+                Close();
+                return false;
+            }
+            // (Any WAV SDL reads, as 16-bit samples with its own channels and rate.)
+            SDL_AudioCVT cvt;
+            if (SDL_BuildAudioCVT(&cvt, spec.format, spec.channels, spec.freq, AUDIO_S16SYS, spec.channels, spec.freq) < 0)
+            {
+                SDL_FreeWAV(data);
+                Close();
+                return false;
+            }
+            std::vector<Uint8> buf((size_t)bytes * std::max(1, cvt.len_mult));
+            memcpy(buf.data(), data, bytes);
+            SDL_FreeWAV(data);
+            cvt.buf = buf.data();
+            cvt.len = (int)bytes;
+            if (cvt.needed) SDL_ConvertAudio(&cvt);
+            wav.resize((size_t)(cvt.needed ? cvt.len_cvt : cvt.len) / 2);
+            memcpy(wav.data(), buf.data(), wav.size() * 2);
+            file.clear();
+            channels = spec.channels;
+            fileRate = spec.freq;
+        }
+        if (channels < 1 || channels > 2 || fileRate <= 0 || (!ogg && wav.size() < (size_t)channels))
+        {
+            fprintf(stderr, "[music] %s: %d channels at %d Hz: only mono or stereo\n", path.c_str(), channels, fileRate);
+            Close();
+            return false;
+        }
+        stream = SDL_NewAudioStream(AUDIO_S16SYS, (Uint8)channels, fileRate, AUDIO_S16SYS, 2, rate);
+        if (!stream)
+        {
+            Close();
+            return false;
+        }
+        from = path;
+        fprintf(stderr, "[music] %s: %d channels at %d Hz\n", path.c_str(), channels, fileRate);
+        return true;
+    }
+    // The next `n` samples (stereo, at the output's rate), from the start again after the end.
+    void Read(int16_t* out, int n)
+    {
+        int16_t piece[2048];
+        const int frames = 1024;
+        while (SDL_AudioStreamAvailable(stream) < n * 2)
+        {
+            int got = 0;
+            if (ogg)
+            {
+                got = stb_vorbis_get_samples_short_interleaved(ogg, channels, piece, frames * channels);
+                if (got == 0) stb_vorbis_seek_start(ogg);
+            }
+            else
+            {
+                got = (int)std::min<size_t>(frames, (wav.size() - wavAt) / channels);
+                memcpy(piece, wav.data() + wavAt, (size_t)got * channels * 2);
+                wavAt += (size_t)got * channels;
+                if (wavAt + channels > wav.size()) wavAt = 0;
+            }
+            if (got > 0 && SDL_AudioStreamPut(stream, piece, got * channels * 2) != 0) break;
+        }
+        const int bytes = std::max(0, SDL_AudioStreamGet(stream, out, n * 2));
+        if (bytes < n * 2) memset((char*)out + bytes, 0, (size_t)(n * 2 - bytes));
+    }
+};
+
+// The sounds, the music and the device that plays them (mixed in SDL's audio callback, Fill;
+// what it reads is changed with the device locked).
 struct State
 {
     std::vector<int16_t> sounds[COUNT];
     std::string from; // (the ROM they were read from)
     SDL_AudioDeviceID device = 0;
+    int rate = 48000;
     bool on = true;
+    bool musicOn = false;
     int volume = 100;
+    int fade = 256; // (the music's level as the list closes, out of 256)
     std::vector<int16_t> playing;
+    size_t playingAt = 0;
+    Music music;
+    std::vector<int16_t> musicPiece;
 };
 inline State& Get()
 {
     static State s;
     return s;
+}
+
+// The music at a little under half the menu sounds' level: a song is made as loud as it can be,
+// the DS's sounds are not.
+constexpr int MusicLevel = 45;
+
+inline void SDLCALL Fill(void*, Uint8* bytes, int len)
+{
+    State& s = Get();
+    int16_t* out = (int16_t*)bytes;
+    const int n = len / 2;
+    memset(out, 0, (size_t)len);
+    if (s.music.stream && s.musicOn && s.volume > 0)
+    {
+        s.musicPiece.resize((size_t)n);
+        s.music.Read(s.musicPiece.data(), n);
+        const int64_t gain = (int64_t)s.volume * MusicLevel * s.fade;
+        for (int i = 0; i < n; i++) out[i] = (int16_t)(s.musicPiece[i] * gain / (10000 * 256));
+    }
+    if (s.on && s.playingAt < s.playing.size())
+    {
+        const int k = (int)std::min<size_t>((size_t)n, s.playing.size() - s.playingAt);
+        for (int i = 0; i < k; i++)
+            out[i] = (int16_t)std::clamp(out[i] + s.playing[s.playingAt + i] * s.volume / 100, -32768, 32767);
+        s.playingAt += (size_t)k;
+    }
 }
 } // namespace detail
 
@@ -684,14 +852,14 @@ inline bool LoadFrom(const std::string& rom, int rate)
 }
 
 // The list's sounds from the first HeartGold or SoulSilver ROM among `roms` (game code, path),
-// played on SDL's audio (started here, as the list may be shown before the game's own SDL), at
-// `volume` (0 to 100, the settings' VOLUME), if `on` (GAME LIST: MENU SOUNDS).
-inline void Start(const std::vector<std::pair<std::string, std::string>>& roms, bool on, int volume)
+// and its music (music.ogg or music.wav in `folder`), played on SDL's audio (started here, as the
+// list may be shown before the game's own SDL), at `volume` (0 to 100, the settings' VOLUME):
+// the sounds if `on` (GAME LIST: MENU SOUNDS), the music if `musicOn` (GAME LIST: MUSIC). Called
+// again when the settings change.
+inline void Start(const std::vector<std::pair<std::string, std::string>>& roms, bool on, int volume,
+                  const std::string& folder = std::string(), bool musicOn = false)
 {
     detail::State& s = detail::Get();
-    s.on = on;
-    s.volume = std::max(0, std::min(100, volume));
-    if (!on || s.device) return;
     std::string rom;
     for (const auto& r : roms)
         if (r.first.size() == 4 && (r.first.compare(0, 3, "IPK") == 0 || r.first.compare(0, 3, "IPG") == 0))
@@ -699,7 +867,33 @@ inline void Start(const std::vector<std::pair<std::string, std::string>>& roms, 
             rom = r.second;
             break;
         }
-    if (rom.empty()) return;
+    std::string song;
+    if (musicOn && !folder.empty())
+        for (const char* name : { "/music.ogg", "/music.wav" })
+            if (FILE* f = fopen((folder + name).c_str(), "rb"))
+            {
+                fclose(f);
+                song = folder + name;
+                break;
+            }
+    if (s.device)
+    {
+        // (Settings changed while the list is up. A ROM's sounds or a song not read when the list
+        // opened, because they were off then, are read now.)
+        SDL_LockAudioDevice(s.device);
+        s.on = on;
+        s.musicOn = musicOn;
+        s.volume = std::max(0, std::min(100, volume));
+        if (on && !rom.empty() && s.from != rom) LoadFrom(rom, s.rate);
+        if (!song.empty() && s.music.from != song) s.music.Open(song, s.rate);
+        SDL_UnlockAudioDevice(s.device);
+        return;
+    }
+    s.on = on;
+    s.musicOn = musicOn;
+    s.volume = std::max(0, std::min(100, volume));
+    s.fade = 256;
+    if ((!on || rom.empty()) && song.empty()) return;
     if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0)
     {
         fprintf(stderr, "[sound] no audio: %s\n", SDL_GetError());
@@ -710,6 +904,7 @@ inline void Start(const std::vector<std::pair<std::string, std::string>>& roms, 
     want.format = AUDIO_S16SYS;
     want.channels = 2;
     want.samples = 1024;
+    want.callback = detail::Fill;
     s.device = SDL_OpenAudioDevice(nullptr, 0, &want, &have, 0);
     if (!s.device)
     {
@@ -717,23 +912,21 @@ inline void Start(const std::vector<std::pair<std::string, std::string>>& roms, 
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         return;
     }
+    s.rate = want.freq;
     // (Read once: the list is shown again after a GBA game.)
-    if (s.from != rom && !LoadFrom(rom, want.freq))
+    bool any = false;
+    if (on && !rom.empty()) any = s.from == rom || LoadFrom(rom, want.freq);
+    if (!song.empty()) any |= s.music.Open(song, want.freq);
+    if (!any)
     {
         SDL_CloseAudioDevice(s.device);
         s.device = 0;
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         return;
     }
+    s.playing.clear();
+    s.playingAt = 0;
     SDL_PauseAudioDevice(s.device, 0);
-}
-
-// MENU SOUNDS and VOLUME as the settings page changes them.
-inline void Set(bool on, int volume)
-{
-    detail::State& s = detail::Get();
-    s.on = on;
-    s.volume = std::max(0, std::min(100, volume));
 }
 
 // A sound, cutting off the one before (as the game's own menu sounds do).
@@ -741,22 +934,34 @@ inline void Play(Sound which)
 {
     detail::State& s = detail::Get();
     if (!s.device || !s.on || s.volume == 0 || s.sounds[which].empty()) return;
+    SDL_LockAudioDevice(s.device);
     s.playing = s.sounds[which];
-    if (s.volume < 100)
-        for (int16_t& v : s.playing) v = (int16_t)(v * s.volume / 100);
-    SDL_ClearQueuedAudio(s.device);
-    SDL_QueueAudio(s.device, s.playing.data(), (Uint32)(s.playing.size() * sizeof(int16_t)));
+    s.playingAt = 0;
+    SDL_UnlockAudioDevice(s.device);
 }
 
 // The device closed (before the game opens its own sound), once the sound playing has finished
-// (at most 0.8 seconds: the choice of a game is heard as it starts).
+// (at most 0.8 seconds: the choice of a game is heard as it starts) and the music has faded out
+// (0.4 seconds).
 inline void Stop()
 {
     detail::State& s = detail::Get();
     if (!s.device) return;
-    for (int i = 0; i < 80 && SDL_GetQueuedAudioSize(s.device) > 0; i++) SDL_Delay(10);
+    for (int i = 0; i < 80; i++)
+    {
+        SDL_LockAudioDevice(s.device);
+        s.fade = std::max(0, 256 - (i + 1) * 256 / 40);
+        const bool sounding = s.on && s.playingAt < s.playing.size();
+        const bool music = s.music.stream && s.musicOn && s.fade > 0;
+        SDL_UnlockAudioDevice(s.device);
+        if (!sounding && !music) break;
+        SDL_Delay(10);
+    }
     SDL_CloseAudioDevice(s.device);
     s.device = 0;
+    s.playing.clear();
+    s.playingAt = 0;
+    s.music.Close();
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 } // namespace MenuSound
