@@ -32,6 +32,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install "cmake>=3.21,<4" ninja
+      - name: Check Mac game shortcuts
+        run: python tests/mac_shortcuts.py
       - name: The inputs (tables of addresses, pictures, icon)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -40,11 +42,15 @@ jobs:
           gh release download mac-build-inputs -R "${{ github.repository }}" -p mac-inputs.tar.gz -D inputs
           tar -xzf inputs/mac-inputs.tar.gz -C inputs
           ls inputs
+      - name: GBA games (mGBA and the widescreen patches, when the inputs include them)
+        run: bash tools/apple/fetch_gba.sh inputs
       - run: tools/mac/build_all.sh inputs/build-gen-tables inputs/box-art inputs/icon.jpg
         env:
           SSR_MAC_ARCH: ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
           name: mac-${{ matrix.arch }}
-          path: build-mac-dist/pokemon-ds-wide-pc-macos-${{ matrix.arch }}.zip
+          path: |
+            build-mac-dist/pokemon-ds-wide-pc-macos-${{ matrix.arch }}.zip
+            build-mac-dist/SHA256SUMS.txt
           if-no-files-found: error

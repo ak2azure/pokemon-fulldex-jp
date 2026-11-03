@@ -1,0 +1,24 @@
+#pragma once
+// Another language's version of a game (Pokemon White in Spanish, IRAS) plays with the English
+// version's layouts (IRAO): its game code differs only in the last letter, the language. Its own
+// function table (tools/versions, tools/port_version.py) or shifts (tools/soulsilver/*.json) say
+// where its functions are; what it is, for everything else, is the English version's code.
+#include <cstring>
+#include <string>
+
+inline std::string BaseGameCode(const std::string& code)
+{
+    static const char* const aliases[][2] = {
+        { "IRAS", "IRAO" }, { "CPUS", "CPUE" }, { "IPGS", "IPGE" }, { "IPKS", "IPKE" },
+        { "ADAS", "ADAE" }, { "IRBF", "IRBO" }, { "IRAF", "IRAO" }, { "IREF", "IREO" },
+        { "IRDF", "IRDO" }, { "IPGF", "IPGE" }, { "IPKF", "IPKE" }, { "CPUF", "CPUE" },
+        { "IPKI", "IPKE" },
+        // The Japanese versions (this fork): their own function tables (tools/bw1, tools/bw2,
+        // tools/platinum/CPUJ.txt) or shifts (tools/soulsilver/*-jp.json).
+        { "IRBJ", "IRBO" }, { "IRAJ", "IRAO" }, { "IREJ", "IREO" }, { "CPUJ", "CPUE" },
+        { "IPGJ", "IPGE" }, { "IPKJ", "IPKE" }
+    };
+    for (const auto& alias : aliases) if (code == alias[0]) return alias[1];
+    return code;
+}
+inline bool IsGame(const std::string& code, const char* english) { return BaseGameCode(code) == english; }

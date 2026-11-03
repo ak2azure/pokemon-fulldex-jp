@@ -8,6 +8,15 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT DEFINED CMAKE_OSX_DEPLOYMENT
     endif()
 endif()
 project(ssrecomp LANGUAGES C CXX)
+# Reconfigure after source edits so the packaged binary build ID advances for hotfixes,
+# including incremental builds that do not explicitly invoke CMake first.
+file(GLOB_RECURSE SSR_BUILD_VERSION_INPUTS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/frontend/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/frontend/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/frontend/*.mm" "${CMAKE_CURRENT_SOURCE_DIR}/runtime/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/runtime/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/melonDS/src/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/melonDS/src/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/melonDS/src/*.S")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${SSR_BUILD_VERSION_INPUTS})
+
 set(SSR_GENERATED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/gen" CACHE PATH "Generated game sources")
 
 set(CMAKE_CXX_STANDARD 17)
@@ -155,7 +164,7 @@ if(ANDROID)
     # (CMAKE_PREFIX_PATH); no libpng: screenshots are a desktop test aid.
     add_library(ssrecomp SHARED ${SSRECOMP_SOURCES})
     set_target_properties(ssrecomp PROPERTIES OUTPUT_NAME main)
-    target_include_directories(ssrecomp PRIVATE melonDS/src frontend runtime)
+    target_include_directories(ssrecomp PRIVATE melonDS/src frontend runtime "${SSR_GENERATED_DIR}")
     target_compile_definitions(ssrecomp PRIVATE SSR_NO_PNG SSR_VERSION="${SSR_VERSION}")
     target_link_libraries(ssrecomp PRIVATE core SDL2::SDL2 android log)
     # The all-games app (tools/android/build_all.sh): no game inside, the game list from the
@@ -172,7 +181,7 @@ elseif(SSR_SWITCH)
     add_executable(ssrecomp ${SSRECOMP_SOURCES} frontend/switch_platform.cpp)
     # main.cpp includes <SDL2/SDL.h>, so the folder above SDL2's own is needed too.
     pkg_get_variable(SDL2_INCLUDEDIR sdl2 includedir)
-    target_include_directories(ssrecomp PRIVATE melonDS/src frontend runtime "${SDL2_INCLUDEDIR}" ${SDL2_STATIC_INCLUDE_DIRS})
+    target_include_directories(ssrecomp PRIVATE melonDS/src frontend runtime "${SSR_GENERATED_DIR}" "${SDL2_INCLUDEDIR}" ${SDL2_STATIC_INCLUDE_DIRS})
     target_compile_options(ssrecomp PRIVATE ${SDL2_STATIC_CFLAGS_OTHER})
     target_compile_definitions(ssrecomp PRIVATE SSR_NO_PNG SSR_VERSION="${SSR_VERSION}")
     target_link_directories(ssrecomp PRIVATE ${SDL2_STATIC_LIBRARY_DIRS})
@@ -283,6 +292,14 @@ elseif(SSR_SWITCH)
         target_compile_definitions(ssrecomp PRIVATE SSR_ALL_GAMES)
         # Its HOME MENU ICONS (the settings page of its list).
         target_sources(ssrecomp PRIVATE frontend/switch_forwarder.cpp)
+        # Updates from its list, as on a PC (frontend/updater.cpp; zlib reads the download's zip).
+        string(TIMESTAMP SSR_BUILT_AT "%s" UTC)
+        file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/fulldex-build-id.txt" "${SSR_BUILT_AT}\n")
+        target_sources(ssrecomp PRIVATE frontend/updater.cpp)
+        set_source_files_properties(frontend/updater.cpp PROPERTIES COMPILE_DEFINITIONS "SSR_BUILT_AT=${SSR_BUILT_AT}")
+        target_compile_definitions(ssrecomp PRIVATE SSR_UPDATER)
+        find_package(ZLIB REQUIRED)
+        target_link_libraries(ssrecomp PRIVATE ZLIB::ZLIB)
     endif()
     add_custom_target(ssrecomp_nro ALL
         COMMAND "${CMAKE_COMMAND}"
@@ -298,7 +315,7 @@ elseif(SSR_SWITCH)
         VERBATIM)
 else()
     add_executable(ssrecomp ${SSRECOMP_SOURCES})
-    target_include_directories(ssrecomp PRIVATE melonDS/src frontend runtime ${SDL2_INCLUDE_DIRS})
+    target_include_directories(ssrecomp PRIVATE melonDS/src frontend runtime "${SSR_GENERATED_DIR}" ${SDL2_INCLUDE_DIRS})
     find_package(Threads REQUIRED)
     if(TARGET SDL2::SDL2)
         if(TARGET SDL2::SDL2main)
@@ -330,6 +347,14 @@ else()
     if(SSR_PC_ALL_GAMES)
         target_sources(ssrecomp PRIVATE frontend/pc_launcher.cpp)
         target_compile_definitions(ssrecomp PRIVATE SSR_PC_LAUNCHER)
+        # Updates from the game list (frontend/updater.cpp). The time of building tells a
+        # download with no record of what was installed from a newer release (only this one file
+        # is compiled again when it changes).
+        string(TIMESTAMP SSR_BUILT_AT "%s" UTC)
+        file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/fulldex-build-id.txt" "${SSR_BUILT_AT}\n")
+        target_sources(ssrecomp PRIVATE frontend/updater.cpp)
+        set_source_files_properties(frontend/updater.cpp PROPERTIES COMPILE_DEFINITIONS "SSR_BUILT_AT=${SSR_BUILT_AT}")
+        target_compile_definitions(ssrecomp PRIVATE SSR_UPDATER)
     endif()
     if(SSR_PS5)
         # The PS5 payload: an ELF that elfldr loads (tools/ps5/build.sh).
@@ -443,6 +468,9 @@ endif()
 # RetroAchievements: the library, and each platform's way to the internet (achievements_http.cpp);
 # the program's version, which the server is told with its name, from CHANGELOG.md's newest release.
 target_link_libraries(ssrecomp PRIVATE rcheevos enet)
+if(ANDROID)
+    target_link_options(ssrecomp PRIVATE "-Wl,-z,max-page-size=16384" "-Wl,-z,common-page-size=16384")
+endif()
 if(WIN32)
     target_link_libraries(ssrecomp PRIVATE winhttp)
 elseif(APPLE)
@@ -450,6 +478,12 @@ elseif(APPLE)
     target_sources(ssrecomp PRIVATE frontend/achievements_http_apple.mm)
     set_source_files_properties(frontend/achievements_http_apple.mm PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x objective-c++")
     target_link_libraries(ssrecomp PRIVATE "-framework Foundation")
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        # The list upright, a game sideways (frontend/ios_orient.mm). UIKit is iOS only.
+        target_sources(ssrecomp PRIVATE frontend/ios_orient.mm)
+        set_source_files_properties(frontend/ios_orient.mm PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-x objective-c++")
+        target_link_libraries(ssrecomp PRIVATE "-framework UIKit")
+    endif()
 elseif(SSR_SWITCH)
     # (devkitPro's libcurl, with its TLS library, from the portlibs.)
     find_package(PkgConfig REQUIRED)

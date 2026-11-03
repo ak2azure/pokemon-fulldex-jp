@@ -32,6 +32,8 @@
 #include <string>
 #include <vector>
 
+#include "gamecode.h"
+
 #include "ARM.h"
 #include "NDS.h"
 #include "funcwatch.h"
@@ -47,13 +49,13 @@ public:
 
     // SoulSilver and HeartGold, as the game starts, with its ROM file and the hook API ready (rc
     // tables loaded).
-    void Init(const std::string& romPath, const std::string& code, melonDS::NDS& nds)
+    void Init(const std::string& romPath, const std::string& gameCode, melonDS::NDS& nds)
     {
-        // (The Japanese versions too, IPGJ and IPKJ: the same archives and table layout, and
-        // the hook's address is moved to theirs by the runtime, as the function tables are:
-        // tools/soulsilver/*-jp.json.)
-        const bool heartGold = code == "IPKE" || code == "IPKJ";
-        if (!heartGold && code != "IPGE" && code != "IPGJ") return;
+        // (The other languages' and the Japanese versions too, gamecode.h: the same archives and
+        // table layout, and the hook's address is moved to theirs by the runtime, as the
+        // function tables are: tools/soulsilver/*.json.)
+        const std::string code = BaseGameCode(gameCode);
+        if (code != "IPGE" && code != "IPKE") return;
         Nds = &nds;
         std::vector<std::vector<uint8_t>> hg, ss;
         if (!ReadNarc(romPath, "a/0/3/7", hg) || !ReadNarc(romPath, "a/1/3/6", ss) || hg.size() != ss.size())
@@ -61,7 +63,7 @@ public:
             fprintf(stderr, "[exclusives] the wild Pokemon tables could not be read\n");
             return;
         }
-        if (heartGold) { Own = std::move(hg); Other = std::move(ss); }
+        if (code == "IPKE") { Own = std::move(hg); Other = std::move(ss); }
         else { Own = std::move(ss); Other = std::move(hg); }
         if (rc_add_hook("main", 0x0203B88C, &VersionExclusives::Read, this) < 0)
         {
@@ -76,9 +78,10 @@ public:
 
     // Black, White, Black 2 and White 2, with the function table (before it is attached: the
     // function is added to those watched).
-    void Init(const std::string& code, FuncWatch& watch, std::vector<std::string>& names, melonDS::NDS& nds)
+    void Init(const std::string& gameCode, FuncWatch& watch, std::vector<std::string>& names, melonDS::NDS& nds)
     {
-        const bool b2w2 = code == "IREO" || code == "IRDO" || code == "IREJ", bw = code == "IRBO" || code == "IRAO" || code == "IRBJ" || code == "IRAJ";
+        const std::string code = BaseGameCode(gameCode);
+        const bool b2w2 = code == "IREO" || code == "IRDO", bw = code == "IRBO" || code == "IRAO";
         if (!b2w2 && !bw) return;
         const char* fn = b2w2 ? "EncData_Load" : "FIELD_ENCOUNT_ST_LoadEncountData";
         const int f = watch.Find(fn);
@@ -102,7 +105,7 @@ public:
             { 214, 127 }, { 240, 239 }, { 325, 322 }, { 326, 323 }, { 367, 368 }, { 427, 300 }, { 428, 301 },
             { 546, 548 }, { 547, 549 }, { 574, 577 }, { 575, 578 }, { 576, 579 }, { 629, 627 },
         };
-        const bool white = code == "IRAO" || code == "IRDO" || code == "IRAJ";
+        const bool white = code == "IRAO" || code == "IRDO";
         Pairs.clear();
         if (b2w2)
             for (const auto& p : bw2) Pairs.push_back({ p[white ? 1 : 0], p[white ? 0 : 1] });

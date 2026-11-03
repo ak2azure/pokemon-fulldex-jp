@@ -13,20 +13,64 @@ widescreen, 60 fps, up to 4K on a PC and 720p on the Switch.** No more squinting
 | **Windows** PC, and Windows handhelds (ROG Ally, Legion Go, MSI Claw) | [pokemon-ds-wide-pc-windows-x86_64.zip](../../releases/download/pc-v1/pokemon-ds-wide-pc-windows-x86_64.zip) | [PC](#on-a-pc-mac-steam-deck-or-handheld-windows-macos-and-linux) |
 | **Mac** with Apple silicon (M1 and newer) | [pokemon-ds-wide-pc-macos-arm64.zip](../../releases/download/pc-v1/pokemon-ds-wide-pc-macos-arm64.zip) | [Mac](#on-a-pc-mac-steam-deck-or-handheld-windows-macos-and-linux) |
 | **Mac** with an Intel processor | [pokemon-ds-wide-pc-macos-x86_64.zip](../../releases/download/pc-v1/pokemon-ds-wide-pc-macos-x86_64.zip) | [Mac](#on-a-pc-mac-steam-deck-or-handheld-windows-macos-and-linux) |
-| **Linux** and the **Steam Deck** | [pokemon-ds-wide-pc-linux-x86_64.tar.gz](../../releases/download/pc-v1/pokemon-ds-wide-pc-linux-x86_64.tar.gz), or as an [AppImage](../../releases/download/pc-v1/pokemon-ds-wide-pc-linux-x86_64.AppImage) (Gear Lever) | [PC](#on-a-pc-mac-steam-deck-or-handheld-windows-macos-and-linux) |
+| **Linux** (glibc 2.38+) and the **Steam Deck** | [pokemon-ds-wide-pc-linux-x86_64.tar.gz](../../releases/download/pc-v1/pokemon-ds-wide-pc-linux-x86_64.tar.gz), or as an [AppImage](../../releases/download/pc-v1/pokemon-ds-wide-pc-linux-x86_64.AppImage) (Gear Lever) | [PC](#on-a-pc-mac-steam-deck-or-handheld-windows-macos-and-linux) |
 | **Android** phone (64-bit, Android 7 or newer) | [pokemon-ds-wide-android.apk](../../releases/download/android-v1/pokemon-ds-wide-android.apk) | [Android](#on-android) |
 | **iPhone** and **iPad** (iOS 14 or newer, sideloaded) | [pokemon-ds-wide-ios.ipa](../../releases/download/ios-v1/pokemon-ds-wide-ios.ipa) | [iPhone](#on-an-iphone-or-ipad) |
 | **Nintendo Switch** (homebrew) | [pokemon-ds-wide-all-switch.zip](../../releases/download/all-games-v2/pokemon-ds-wide-all-switch.zip) | [Switch](#on-the-nintendo-switch) |
 
 **All seven DS games in every download:** Pokémon Black 2, White 2, Black, White, SoulSilver,
-HeartGold and Platinum. **The GBA games too** on Windows, Linux, Android and the Switch:
-Pokémon Emerald, FireRed, LeafGreen and Ultra Violet ([below](#the-gba-games)). Pokémon Omega
+HeartGold and Platinum. **The GBA games too**, on Windows, Linux, Mac, Android, iPhone, iPad
+and the Switch: Pokémon Emerald, FireRed, LeafGreen and Ultra Violet ([below](#the-gba-games)). Pokémon Omega
 Ruby is in the works, as its own project: it is in the game list's 3DS tab, COMING SOON.
 What's new in each: [Releases](../../releases).
 
 One program per platform: start it and pick the game from the list. The
 downloads are free of the games themselves: you bring your own ROMs, and the
 program reads what it needs from them when the game starts.
+
+## Updates
+
+The game list checks for updates when it opens. When a new version is available, choose
+INSTALL or LATER; CHECK FOR UPDATES in SETTINGS > HELP remains available afterwards.
+Downloads are checked against SHA256SUMS.txt from the same release, and the previous program
+is kept. ROMs, saves and settings remain in place. Android uses its system installer; Mac and
+iPhone/iPad open the download page. A release without checksums is offered as a download page
+rather than installed automatically.
+
+CHEATS in the pause menu has SEARCH (names, folders and descriptions), scrollable details,
+and DATABASE INFO. Type with the keyboard or use the letter chooser with a controller or touch.
+Choose a code for details, or use left/right to switch it on or off directly.
+
+DS games also have SAVE BACKUPS in the pause menu. Choose a dated backup, review the confirmation,
+and RESTORE AND RESTART. The previous save is kept beside it with `.before-restore.sav` added to
+its name. An interrupted restore reports its recovery files instead of overwriting them.
+
+### Regional support - beta
+
+
+**Regional DS support is now in beta across the platform builds.** Bring your own ROM;
+only the listed language/version profiles are recognised. This is not support for every
+language, revision or game, and complete playthroughs have not been verified.
+
+| Language | Games with added profiles |
+|---|---|
+| French (revision 0) | Black, White, Black 2, White 2, SoulSilver, HeartGold, Platinum |
+| Spanish | White, Platinum, SoulSilver, HeartGold |
+| Italian | HeartGold |
+| Experimental | English Diamond/Pearl and Spanish Diamond |
+
+Regional versions use separate save names, such as `heartgold-fr.sav`, `heartgold-es.sav`
+and `heartgold-it.sav`; keep a backup when bringing an existing save across. GBA regional
+compatibility is unchanged. DISPLAY > LANGUAGE offers English, Spanish and Italian menus;
+French ROM support does not currently include a French interface.
+
+Thanks to the contributors of [#41](../../pull/41), [#18](../../pull/18) and [#9](../../pull/9).
+See [regional support and controls](docs/REGIONAL-AND-TOUCH-CONTROLS.md) for details.
+
+Android also adds movable/resizable DS and GBA touch controls, a landscape launcher that
+allows portrait with auto-rotate enabled, larger settings menus, and inset FPS counters.
+The native libraries now support 16 KB Android memory pages; the previous APK crashed on
+our 16 KB emulator before drawing the launcher. Physical Odin 3 verification is pending.
 
 ## Use your own save
 
@@ -46,7 +90,7 @@ cartridge. Copy it in under the game's name, in this folder:
 |---|---|
 | Black 2 / White 2 | `black2.sav` / `white2.sav` |
 | Black / White | `black.sav` / `white.sav` |
-| SoulSilver / HeartGold | `soulsilver.sav` / `heartgold.sav` |
+| SoulSilver / HeartGold | `soulsilver.sav` / `heartgold.sav` (Italian: `heartgold-it.sav`) |
 | Platinum | `platinum.sav` |
 
 - **Which files work:** a plain `.sav`, as melonDS, DeSmuME (Export Backup
@@ -56,6 +100,9 @@ cartridge. Copy it in under the game's name, in this folder:
   [`tools/bw2/convert_save.py`](tools/bw2/convert_save.py).
 - **Check it worked:** the game list shows SAVE FOUND under the game (NEW GAME: not found).
 - **Back up first:** a save copied in replaces the one there under that name.
+- **Older copies:** a `backups` folder beside your saves keeps the last 8 versions of each
+  (made as a game starts and every half hour of play, named by date and time). To go back to
+  one, quit the game and copy it over your save with the save's own name.
 
 ## Settings
 
@@ -65,15 +112,16 @@ controller, or SETTINGS at the top), or in the pause menu while you play (**Esc*
 
 | Group | Settings |
 |---|---|
-| DISPLAY | SCREEN LAYOUT (MERGED: the one widescreen picture), LARGE SCREEN, BORDERLESS FULLSCREEN, SMOOTH SCALING, BATTLE BUTTONS, FPS COUNTER |
+| DISPLAY | LANGUAGE, SCREEN LAYOUT (MERGED: the one widescreen picture), LARGE SCREEN, BORDERLESS FULLSCREEN, SMOOTH SCALING, BATTLE BUTTONS, FPS COUNTER |
 | SOUND | VOLUME (a slider: OFF, then 10% to 100%) |
 | GRAPHICS | 60 FPS, WIDESCREEN WORLD, WIDE MAP LOADING, 3D RESOLUTION (WORLD DETAIL on the Switch), LOWER RES WHEN BUSY, WORLD ON GPU, FAST FORWARD LOW RES |
-| CONTROLS | **KEYS AND BUTTONS** (give any DS button, the pause menu, fast forward or swapping the screens another key or controller button), START BUTTON, BUTTONS, STICK TOUCH CURSOR |
+| CONTROLS | **KEYS AND BUTTONS** (give any DS button, the pause menu, fast forward, swapping the screens, save state or load state another key or controller button), START BUTTON, BUTTONS, STICK TOUCH CURSOR |
 | SHORTCUTS | DESKTOP SHORTCUTS (PC), HOME MENU ICONS (Switch): a shortcut for each game |
 
 The pause menu also has RESUME, SAVE STATE, LOAD STATE, FAST FORWARD, CHEATS
 ([below](#cheats)), RETROACHIEVEMENTS ([below](#retroachievements)), RESET GAME and QUIT
-(back to the game list). Not every platform has
+(back to the game list). LOAD STATE takes you back to where the state was made but leaves your
+in-game save as it is; saving in the game afterwards writes over it as usual. Not every platform has
 every setting: a phone and the Switch are always full screen, for one.
 
 ## RetroAchievements
@@ -120,9 +168,11 @@ in a `cheats` folder (make it if it isn't there):
 | iPhone and iPad | Files app: On My iPhone (or iPad) > Pokémon Fulldex > `cheats` |
 | Nintendo Switch | `/switch/pokemon-ds-wide/cheats/` on the SD card |
 
-- **A cheat database:** `usrcheat.dat` holds codes for every game; CHEATS lists this
-  game's, in their folders, with the database's note on the chosen one under the menu.
-  The one most people use is DeadSkullzJr's: download it from
+- **A cheat database:** `usrcheat.dat` holds codes for every game. CHEATS opens this
+  game's folders (a folder with any on shows how many, or the one that is on). Open a
+  folder for its codes. The database's note on the chosen code shows under the menu.
+  **ON NOW**, at the top, lists every code that is on. Codes of your own are listed
+  above the folders. The one most people use is DeadSkullzJr's: download it from
   [his GBAtemp thread](https://gbatemp.net/threads/deadskullzjrs-nds-cheat-databases.488711/)
   and put `usrcheat.dat` in the `cheats` folder.
 - **Codes of your own:** a text file named after the game's code: `IREO.txt` (Black 2),
@@ -185,9 +235,10 @@ opens the pause menu; **QUIT** there goes back to the list.
 **Controls:** any controller (Xbox, PlayStation, Switch Pro and others) plays
 as a DS; hold its right trigger to fast forward. On the keyboard: arrow keys,
 X/Z for A/B, S/A for X/Y, Q/W for L/R, Enter for START, Backspace for SELECT,
-the mouse for the touch screen and Left Shift to fast forward. The `README.txt`
-inside has the full list. **CONTROLS > KEYS AND BUTTONS** in the pause menu (or on the game list's
-settings page) changes any of them, on the keyboard and on a controller (the game list follows the ones you change).
+the mouse for the touch screen, Left Shift to fast forward, F5 to save a state and F8 to load it.
+The `README.txt` inside has the full list. **CONTROLS > KEYS AND BUTTONS** in the pause menu (or on
+the game list's settings page) changes any of them, including fast forward, swapping the screens,
+save state and load state, on the keyboard and on a controller (the game list follows the ones you change).
 
 **Saves** go in the `saves` folder, one per game (`black2.sav`, `soulsilver.sav`,
 `platinum.sav`, ...). To carry on from another emulator, put its `.sav` there
@@ -237,8 +288,8 @@ library in Gaming Mode with a gamepad controller layout. Set 3D RESOLUTION to
    *Or*, in Terminal: `xattr -dr com.apple.quarantine "/Applications/Pokemon Fulldex.app"`,
    then open it as any app.
 4. **Add your ROMs:** press **O** in the game list. The Finder opens its `roms` folder
-   (`~/Library/Application Support/Pokemon DS Widescreen/roms`): put your ROMs in it and they
-   appear in the list. Your own saves go in the `saves` folder next to it.
+   (`~/Library/Application Support/Pokemon DS Widescreen/roms`): put your DS and GBA ROMs in
+   it and they appear in the list. Your own saves go in the `saves` folder next to it.
 
 The keys and a controller work as on a PC; **Ctrl+Cmd+F** (or F11) switches between fullscreen
 and a window. A Mac's OpenGL stops short of what WORLD ON GPU needs, so the processor draws the
@@ -352,7 +403,8 @@ MENU at the top) while you play by touch; hold **>>** beside R to fast forward; 
 picture itself to touch the DS's touch screen. A controller (Bluetooth or USB: Xbox, PlayStation, Backbone,
 Razer Kishi and others) plays as a DS and hides the on-screen buttons; its
 **Start** opens the pause menu and its right trigger fast forwards. **CONTROLS > KEYS
-AND BUTTONS** in the pause menu changes which button does what.
+AND BUTTONS** in the pause menu (and on the game list) changes which button does what,
+including fast forward, swapping the screens, save state and load state.
 
 **Saves** go in a `saves` folder inside your ROMs folder (made for you). The
 settings and `game.log` are in `Android/data/io.github.mamesj.pokemonds/files`.
@@ -378,13 +430,15 @@ iPhone. From a Windows PC or a Mac:
    then trust your Apple ID in **Settings > General > VPN & Device Management**.
 4. **Put your ROMs** in the Files app: **On My iPhone > Pokémon Fulldex > roms** (AirDrop,
    iCloud Drive, or from a PC: the Apple Devices app's Files tab, or the Finder on a Mac).
-   **FOLDER** at the top of the game list opens that folder. Tap a game twice to play.
+   DS and GBA ROMs go in that same `roms` folder. A `.gba` opened from the Files app is
+   taken in too. **FOLDER** at the top of the game list opens that folder. Tap a game twice to play.
 
 With a free Apple ID, iOS stops opening sideloaded apps after 7 days: sideload it again (your
 saves stay). AltStore and SideStore can do that for you.
 
 **Controls:** as on Android: on-screen buttons while you play by touch (MENU at the top for
 the pause menu), or a controller (Xbox, PlayStation, Backbone and others), which hides them.
+The game list is upright. Starting a game turns an iPhone or an iPad sideways.
 
 **Saves, settings, cheats and `game.log`** are all in that Pokémon Fulldex folder in the
 Files app.
@@ -432,8 +486,8 @@ Please tell us how it runs on yours, with your model (see [Reporting a bug](#rep
 | ![HeartGold: Totodile against a wild Pidgey on Route 29, with FIGHT, BAG, RUN, POKÉMON and the party beside the battle](docs/screenshots/heartgold-totodile-battle.jpg) | ![SoulSilver: Lugia following you along Route 7](docs/screenshots/soulsilver-lugia-following.jpg) |
 
 - **ROMs:** the English versions, US or Europe (the European English copies
-  are the same game as the US ones). Other languages start, but without the
-  one-screen layouts.
+  are the same game as the US ones), Spanish and French revision 0; HeartGold
+  also supports Italian. Other languages start without the one-screen layouts.
 - **Saves:** `soulsilver.sav` and `heartgold.sav` (the same format, so either
   game reads the other's).
 - **No version exclusives:** OTHER VERSION POKEMON in the pause menu (off to
@@ -455,7 +509,7 @@ Please tell us how it runs on yours, with your model (see [Reporting a bug](#rep
 | ![Black: Reshiram against a wild Mantyke, with the game's FIGHT, BAG, RUN and POKÉMON panel beside the battle](docs/screenshots/black-reshiram-battle.jpg) | ![White: Zekrom in battle, with the FIGHT panel beside it](docs/screenshots/white-zekrom-battle.jpg) |
 | ![Black: a double battle, Reshiram and Excadrill against a wild Pelipper and Mantyke, the HP boxes down the edges](docs/screenshots/black-reshiram-double.jpg) | ![Black: Nimbasa City in widescreen](docs/screenshots/black-nimbasa.jpg) |
 
-- **ROMs:** any English copy (US or Europe), trimmed or not.
+- **ROMs:** any English copy (US or Europe), trimmed or not; French revision 0 for both games, and White in Spanish too.
 - **Saves:** `black.sav` and `white.sav` (the same format, so either game reads
   the other's; `tools/bw2/convert_save.py` turns `.dsv` and Action Replay saves
   into the raw 512 KB save).
@@ -475,8 +529,8 @@ Please tell us how it runs on yours, with your model (see [Reporting a bug](#rep
 |---|---|
 | ![Platinum: Infernape against a wild Machoke, with FIGHT, BAG, RUN and POKÉMON beside the battle](docs/screenshots/platinum-infernape-battle.jpg) | ![Platinum: Snowpoint City in the snow, in widescreen](docs/screenshots/platinum-snowpoint.jpg) |
 
-- **ROM:** the English version, US or Europe (both game code `CPUE`), trimmed
-  or not.
+- **ROM:** the English version, US or Europe (both game code `CPUE`), or the
+  Spanish (`CPUS`) or French revision 0 (`CPUF`) versions, trimmed or not.
 - **Save:** `platinum.sav`.
 - **What you get:** Sinnoh in widescreen, the snow and rain reaching the edges
   of the view; battles with their buttons and moves beside the action; the X
@@ -496,8 +550,8 @@ Please tell us how it runs on yours, with your model (see [Reporting a bug](#rep
 | ![LeafGreen: Venusaur's Razor Leaf at Articuno in the Seafoam Islands](docs/screenshots/gba-leafgreen-articuno-battle.png) | ![LeafGreen: Lavender Town, with Pokémon Tower at the top](docs/screenshots/gba-leafgreen-lavender.png) |
 
 Pokémon Emerald, FireRed, LeafGreen and Ultra Violet (a FireRed hack) in widescreen at 60 fps,
-from [Pokémon GBA Widescreen](#credits-and-licence), built in (Windows, Linux, Android and the
-Switch; not yet on a Mac, iPhone or iPad).
+from [Pokémon GBA Widescreen](#credits-and-licence), built in on Windows, Linux, Mac, Android,
+iPhone, iPad and the Switch.
 
 - **ROMs:** put them in the same `roms` folder as the DS games: Emerald, FireRed and LeafGreen
   (version 1.0 or 1.1), and Ultra Violet as its `.gba` or as its `.ips` patch with a FireRed
@@ -520,7 +574,10 @@ OLED in handheld mode; a PC has room to spare, and draws the same picture up to
 
 ## Known limits
 
-- English versions only (US or Europe), for every game.
+- English versions (US or Europe) for the seven established DS games; French
+  revision 0 for all seven; Spanish White, Platinum, SoulSilver and HeartGold;
+  Italian HeartGold. Diamond/Pearl support is experimental. See
+  [regional profiles and touch controls](docs/REGIONAL-AND-TOUCH-CONTROLS.md).
 - Platinum: the Pokétch (the watch on the touch screen) isn't shown during
   normal play; its apps are one press of the screen-swap button away.
 - SoulSilver and HeartGold: at map borders (Route 29 and New Bark Town, Celadon
@@ -559,7 +616,8 @@ version and the **`game.log`** file, which says what the program did:
 A screenshot or short video helps too. Please never attach your ROM. A white or
 black screen when a game starts usually means the ROM isn't one the program
 plays: an English copy (US or Europe) of Black, White, Black 2, White 2,
-SoulSilver, HeartGold or Platinum, unchanged (no
+SoulSilver, HeartGold or Platinum, or a Spanish copy of White, Platinum,
+SoulSilver or HeartGold, unchanged (no
 patches, translations, randomizers or trimming).
 
 ## Support
@@ -594,3 +652,9 @@ open an issue and it will be taken out.
 ---
 
 Built with the help of [Claude](https://claude.ai), Anthropic's AI.
+
+## Custom touch controls and regional profiles
+
+Android players can move and resize on-screen controls in the paused layout editor.
+The launcher and DS menus also offer AUTO, English, Spanish and Italian interface
+languages. See [controls, regional games and build notes](docs/REGIONAL-AND-TOUCH-CONTROLS.md).

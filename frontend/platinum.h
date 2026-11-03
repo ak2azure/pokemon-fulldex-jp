@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "funcwatch.h"
+#include "gamecode.h"
 
 struct PtFuncs
 {
@@ -21,7 +22,9 @@ struct PtFuncs
     // touch screen's picture (0xRRGGBB pixels): INTRO_YESNO, his YES / NO (YES red at x 100-140,
     // y 70-92, NO blue at y 110-132); INTRO_BALL, "Touch the button on the middle of the Poke
     // Ball" (the ball at x 58-200, y 26-170, its pale blue button at 128, 96); 0 for neither.
+    // (Diamond and Pearl's NO is higher, at y 102-124: IntroNoY says where NO was seen.)
     enum { INTRO_YESNO = 1, INTRO_BALL = 2 };
+    static inline int IntroNoY = 121;
     static int IntroTouch(const uint32_t* bottom)
     {
         if (!bottom) return 0;
@@ -30,12 +33,47 @@ struct PtFuncs
             return std::abs((int)((c >> 16) & 0xFF) - r) < 40 && std::abs((int)((c >> 8) & 0xFF) - g) < 40 &&
                    std::abs((int)(c & 0xFF) - b) < 40;
         };
-        if (is(108, 76, 251, 89, 89) && is(132, 84, 251, 89, 89) && is(108, 116, 73, 154, 219) && is(132, 124, 73, 154, 219))
+        // Find the coloured button areas independently of translated lettering.
+        int red = 0, blue = 0, blueY = 0;
+        for (int y = 70; y < 92; ++y)
+            for (int x = 100; x < 140; ++x) red += is(x, y, 251, 89, 89);
+        for (int y = 96; y < 140; ++y)
+            for (int x = 100; x < 140; ++x)
+                if (is(x, y, 73, 154, 219)) { ++blue; blueY += y; }
+        if (red >= 250 && blue >= 250)
+        {
+            IntroNoY = blueY / blue;
             return INTRO_YESNO;
+        }
+        if (is(108, 76, 251, 89, 89) && is(132, 84, 251, 89, 89) && is(104, 108, 73, 154, 219) && is(136, 116, 73, 154, 219))
+        {
+            IntroNoY = 113;
+            return INTRO_YESNO;
+        }
         if (is(100, 70, 219, 97, 97) && is(156, 70, 219, 97, 97) && is(128, 60, 219, 97, 97) && is(100, 120, 251, 251, 251) &&
             is(156, 120, 251, 251, 251) && is(128, 130, 251, 251, 251) && is(128, 96, 211, 227, 251))
             return INTRO_BALL;
         return 0;
+    }
+
+    // The Pokedex list's three touch-screen buttons (SEARCH, SWITCH, CHECK), from the colours
+    // at their centres. The Poke Ball beside them is what a click on the right of the view hits.
+    static bool DexListButtons(const uint32_t* bottom)
+    {
+        if (!bottom) return false;
+        auto at = [&](int x, int y, int* r, int* g, int* b) {
+            const uint32_t c = bottom[y * 256 + x] & 0xFFFFFF;
+            *r = (int)((c >> 16) & 0xFF);
+            *g = (int)((c >> 8) & 0xFF);
+            *b = (int)(c & 0xFF);
+        };
+        int r, g, b;
+        at(60, 42, &r, &g, &b);
+        if (!(g > 140 && g > r + 20 && b < 160)) return false;
+        at(60, 88, &r, &g, &b);
+        if (!(b > 140 && g > 140 && r < 140)) return false;
+        at(60, 160, &r, &g, &b);
+        return g > 140 && g > r + 20 && b < 160;
     }
 
     // Whether a weather with particles ran within the last `frames` frames.
@@ -58,6 +96,7 @@ struct PtFuncs
     }
 
     bool on = false;
+    bool dp = false; // Diamond or Pearl (their battle panels are told by which was drawn, not by colour)
     int field = -1;          // the overworld, every frame
     int startMenu = -1;      // the X menu (and the applications started from it)
     int dex = -1, party = -1, bag = -1, trainerCard = -1, options = -1, summary = -1;
@@ -106,9 +145,11 @@ struct PtFuncs
             if (fseek(f, 0x0C, SEEK_SET) != 0 || fread(code, 1, 4, f) != 4) code[0] = 0;
             fclose(f);
         }
-        // (The Japanese Platinum, CPUJ: the same program, its table at its own addresses:
-        // tools/platinum/CPUJ.txt, made by tools/match_table.py.)
-        on = !strcmp(code, "CPUE") || !strcmp(code, "CPUJ");
+        // (Diamond and Pearl: the same engine, their table has Platinum's names: tools/port_family.py.
+        // The Japanese Platinum, CPUJ, is the same program, its table at its own addresses:
+        // tools/platinum/CPUJ.txt, made by tools/match_table.py; gamecode.h.)
+        on = IsGame(code, "CPUE") || IsGame(code, "ADAE") || IsGame(code, "APAE");
+        dp = IsGame(code, "ADAE") || IsGame(code, "APAE");
         if (!on) return;
         auto find = [&](const char* name) {
             names.push_back(name);

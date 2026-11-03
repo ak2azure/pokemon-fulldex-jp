@@ -184,6 +184,9 @@ all)
     cp tools/platinum/CPUE.txt "$ROMFS/funcs/CPUE.txt"
     # (The Japanese Platinum: the same functions at its addresses, tools/match_table.py.)
     cp tools/platinum/CPUJ.txt "$ROMFS/funcs/CPUJ.txt"
+    cp tools/platinum/ADAE.txt "$ROMFS/funcs/ADAE.txt" # Diamond: Platinum's names (tools/port_family.py)
+    python3 tools/shift_table.py --all "$ROMFS/funcs" # (the other languages: tools/versions)
+    cp tools/regions/{IREF,IRDF,CPUF,IRBF,IRAF}.txt "$ROMFS/funcs/"
     # The HOME Menu entries' program (HOME MENU ICONS in the list's settings: frontend/switch_forwarder.cpp).
     say "The HOME Menu icons' loader (tools/switch/forwarder)"
     build bash tools/switch/build_forwarder.sh "$HERE/$BUILD/forwarder-build" "$ROMFS/forwarder"
@@ -247,6 +250,7 @@ want = ['switch/pokemon-ds-wide/pokemon-ds-wide.nro'] + sys.argv[2:] + ['switch/
 if names != want: sys.exit('unexpected files in the zip: %s' % names)
 print('zip holds:', ', '.join(names))
 " "build-sd/$ZIP" $LICENCES
+    python3 tools/updater/write_checksums.py build-sd --build "$ZIP=$BUILD/fulldex-build-id.txt"
     say "Done: $HERE/build-sd/$ZIP"
     ls -l build-sd/switch/pokemon-ds-wide "build-sd/$ZIP"
     cat <<EOF
@@ -357,6 +361,9 @@ platinum)
     cp tools/platinum/CPUE.txt "$ROMFS/funcs/CPUE.txt"
     # (The Japanese Platinum: the same functions at its addresses, tools/match_table.py.)
     cp tools/platinum/CPUJ.txt "$ROMFS/funcs/CPUJ.txt"
+    cp tools/platinum/ADAE.txt "$ROMFS/funcs/ADAE.txt" # Diamond: Platinum's names (tools/port_family.py)
+    python3 tools/shift_table.py --all "$ROMFS/funcs" # (the other languages: tools/versions)
+    cp tools/regions/CPUF.txt "$ROMFS/funcs/"
     rm -f "$BUILD/icon.jpg"
     icon="${SSR_SWITCH_ICON_PLATINUM:-${SSR_SWITCH_ICON:-}}"
     [ -n "$icon" ] && install -D -m 644 "$icon" "$BUILD/icon.jpg"

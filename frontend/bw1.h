@@ -18,6 +18,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+
+#include "gamecode.h"
 #include <vector>
 
 #include "funcwatch.h"
@@ -58,9 +60,10 @@ public:
             if (fseek(f, 0x0C, SEEK_SET) != 0 || fread(code, 1, 4, f) != 4) code[0] = 0;
             fclose(f);
         }
-        // (The Japanese versions, IRBJ and IRAJ, are the same program: their tables put the same
-        // functions at their own addresses, tools/bw1/match_jp.py.)
-        on = !strcmp(code, "IRBO") || !strcmp(code, "IRAO") || !strcmp(code, "IRBJ") || !strcmp(code, "IRAJ");
+        // (The Japanese versions, IRBJ and IRAJ, are the same program, as the other languages
+        // are: their tables put the same functions at their own addresses, tools/bw1/match_jp.py;
+        // gamecode.h.)
+        on = IsGame(code, "IRBO") || IsGame(code, "IRAO");
         if (!on) return;
         Fw = &fw;
         auto find = [&](const char* name) {

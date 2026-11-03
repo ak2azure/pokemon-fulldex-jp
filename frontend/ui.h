@@ -10,6 +10,7 @@
 
 #include "i18n.h"
 #include "jpfont.h"
+#include "ui_lang.h"
 
 struct Canvas
 {
@@ -126,6 +127,7 @@ struct Canvas
             { 0x00, 0x04, 0x0A, 0x0A, 0x11, 0x1F, 0x00 },
             { 0x18, 0x19, 0x02, 0x04, 0x08, 0x13, 0x03 }, // % (VOLUME)
         };
+        if (c == '\'') { static const uint8_t apostrophe[] = { 4, 4, 8, 0, 0, 0, 0 }; return apostrophe; }
         if (c >= 'a' && c <= 'z') c -= 32;
         if (c >= 'A' && c <= 'Z') return font[c - 'A'];
         if (c >= '0' && c <= '9') return font[26 + c - '0'];
@@ -138,15 +140,40 @@ struct Canvas
     // nearest the letters' height (7 dots at `scale`): 1 for scale 2, 2 for 3 and 4.
     static int JpScale(int scale) { return std::max(1, (7 * scale + 6) / 12); }
 
-    // The text as drawn (I18n::Tr: in the menus' language), its width in pixels.
+    // A Latin letter with an accent (Spanish, Italian: UTF-8 C3 xx, code points 0xC0 to 0xFF) as
+    // the plain capital and its mark above the line (1 acute, 2 tilde, 3 grave), or 0.
+    static char Accented(unsigned cp, int& mark)
+    {
+        mark = 0;
+        if (cp < 0xC0 || cp > 0xFF) return 0;
+        const char b = (char)(0x80 | (cp - 0xC0));
+        static const char from[] = "\x81\x89\x8D\x93\x9A\x91\xA1\xA9\xAD\xB3\xBA\xB1", to[] = "AEIOUNAEIOUN";
+        if (const char* p = strchr(from, b))
+        {
+            const char c = to[p - from];
+            mark = c == 'N' ? 2 : 1;
+            return c;
+        }
+        static const char grave[] = "\x80\x88\x8C\x92\x99\xA0\xA8\xAC\xB2\xB9", plain[] = "AEIOUAEIOU";
+        if (const char* g = strchr(grave, b))
+        {
+            mark = 3;
+            return plain[g - grave];
+        }
+        return '?';
+    }
+
+    // The text as drawn (UiLang::Tr: in the interface's language, Japanese through I18n), its
+    // width in pixels.
     static int TextWidth(const std::string& s, int scale)
     {
-        const std::string t = I18n::Tr(s);
+        const std::string t = UiLang::Tr(s);
         int w = 0;
+        int mark;
         for (size_t at = 0; at < t.size();)
         {
             const unsigned cp = I18n::Next(t, at);
-            if (cp < 0x80) w += 6 * scale;
+            if (cp < 0x80 || Accented(cp, mark)) w += 6 * scale;
             else if (const JpFont::Glyph* g = JpFont::Find(cp)) w += g->w * JpScale(scale);
             else w += 12 * JpScale(scale);
         }
@@ -156,32 +183,53 @@ struct Canvas
     // translate false: s is drawn as it is (a line of a text translated as a whole, WrapPx).
     void Text(int x, int y, const std::string& s, int scale, uint32_t argb, bool translate = true)
     {
-        const std::string t = translate ? I18n::Tr(s) : s;
+        const std::string t = translate ? UiLang::Tr(s) : s;
         const int js = JpScale(scale);
         // (The 12-dot characters centred on the letters' 7 dots.)
         const int jy = y + (7 * scale - 11 * js) / 2;
         for (size_t at = 0; at < t.size();)
         {
             const unsigned cp = I18n::Next(t, at);
+            int mark = 0;
+            char c = (char)cp;
             if (cp >= 0x80)
             {
-                const JpFont::Glyph* g = JpFont::Find(cp);
-                if (g)
-                    for (int row = 0; row < 12; row++)
-                        for (int col = 0; col < g->w; col++)
-                            if (g->rows[row] & (0x8000 >> col))
-                                Fill(x + col * js, jy + row * js, js, js, argb);
-                x += (g ? g->w : 12) * js;
-                continue;
+                c = Accented(cp, mark);
+                if (!c)
+                {
+                    const JpFont::Glyph* g = JpFont::Find(cp);
+                    if (g)
+                        for (int row = 0; row < 12; row++)
+                            for (int col = 0; col < g->w; col++)
+                                if (g->rows[row] & (0x8000 >> col))
+                                    Fill(x + col * js, jy + row * js, js, js, argb);
+                    x += (g ? g->w : 12) * js;
+                    continue;
+                }
             }
-            char c = (char)cp;
             // \x05: E with an acute accent (the É of POKÉMON): a whole E, the accent above the
             // line, two pixels slanting up to the right with a row's gap.
             if (c == '\x05')
             {
+                c = 'E';
+                mark = 1;
+            }
+            if (mark == 1)
+            {
                 Fill(x + 3 * scale, y - 3 * scale, scale, scale, argb);
                 Fill(x + 2 * scale, y - 2 * scale, scale, scale, argb);
-                c = 'E';
+            }
+            else if (mark == 3)
+            {
+                Fill(x + scale, y - 3 * scale, scale, scale, argb);
+                Fill(x + 2 * scale, y - 2 * scale, scale, scale, argb);
+            }
+            else if (mark == 2)
+            {
+                Fill(x + 1 * scale, y - 2 * scale, scale, scale, argb);
+                Fill(x + 2 * scale, y - 3 * scale, scale, scale, argb);
+                Fill(x + 3 * scale, y - 2 * scale, scale, scale, argb);
+                Fill(x + 4 * scale, y - 3 * scale, scale, scale, argb);
             }
             if (const uint8_t* g = Glyph(c))
                 for (int row = 0; row < 7; row++)
@@ -280,7 +328,9 @@ struct Menu
     // The chosen row's colour (COLOUR, AccentNamed); the box, text and bars are shaded from it.
     static inline uint32_t Accent = 0xFFE0242C;
 
-    void Draw(Canvas& c, const std::string& title, const std::string& hint, const std::string& note = "") const
+    // boxUnits: the box's width at scale 1 (0: 190, as the other pages). CHEATS passes 260 so a
+    // code's name (32 letters) fits beside "< OFF >".
+    void Draw(Canvas& c, const std::string& title, const std::string& hint, const std::string& note = "", int boxUnits = 0) const
     {
         // (Each channel of the accent c: f(c) per part. With blue, 0xFF3D6FD1, it is the menu as
         // it was: the box 0x1C2A44, the text 0xC8D0E0, the hints 0x8FA0C0.)
@@ -308,7 +358,10 @@ struct Menu
         scroll = std::max(0, std::min(scroll, (int)items.size() - shown));
         const int rows = shown + (hasTitle ? 3 : 2);
         if (lineH * rows + 6 * scale > c.h - 4) lineH = std::max(9 * scale, (c.h - 4 - 6 * scale) / rows);
-        int boxW = 190 * scale;
+        int boxW = (boxUnits > 0 ? boxUnits : 190) * scale;
+        if (UiLang::lang)
+            for (const auto& item : items)
+                boxW = std::max(boxW, Canvas::TextWidth(item.label, scale) + Canvas::TextWidth(item.value, scale) + 20 * scale);
         if (boxW > c.w - 8) boxW = c.w - 8;
         int boxH = lineH * rows + 6 * scale;
         // The note's lines (up to 4, the last cut short), and the box moved up to make room.
@@ -322,7 +375,7 @@ struct Menu
                 if (!line.empty() && Canvas::TextWidth(t, scale) > maxW) { noteLines.push_back(line); line = w; }
                 else line = t;
             };
-            for (char ch : note + " ")
+            for (char ch : UiLang::Tr(note) + " ")
             {
                 if (ch == ' ') { if (!word.empty()) push(word); word.clear(); }
                 else word += ch;
