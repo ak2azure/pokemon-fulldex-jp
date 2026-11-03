@@ -1552,6 +1552,26 @@ bool Start(int& argc, char**& argv)
     // QUIT starts the program again for the list, whose few lines would otherwise replace it).
     const std::string logPath = fo.dir + "/game.log";
     struct stat ls;
+#ifdef SSR_VK_RENDER
+    // (A graphics chip start that never finished (Ps5::StartPicture's mark) leaves a short log,
+    // which the next start would replace: it is kept as vulkan-failed.log. Only that start's:
+    // the ones after it, which draw with the processor, do not try Vulkan.)
+    bool vulkanFailed = false;
+    if (stat((fo.dir + "/vulkan-starting").c_str(), &ls) == 0)
+        if (FILE* f = fopen(logPath.c_str(), "rb"))
+        {
+            std::string text(64 * 1024, '\0');
+            text.resize(fread(&text[0], 1, text.size(), f));
+            fclose(f);
+            vulkanFailed = text.find("[vulkan] making the instance") != std::string::npos;
+        }
+    if (vulkanFailed)
+    {
+        const std::string failed = fo.dir + "/vulkan-failed.log";
+        remove(failed.c_str());
+        rename(logPath.c_str(), failed.c_str());
+    }
+#endif
     if (stat(logPath.c_str(), &ls) == 0 && ls.st_size > 1024)
     {
         const std::string prev = fo.dir + "/game-previous.log";
