@@ -2624,6 +2624,7 @@ int main(int argc, char** argv)
         int battleList = -1, battleBag = -1, battleChoice = -1, battleYesNo = -1;
         int setupSingle = -1, setupDouble = -1, setupTriple = -1, setupRotation = -1;
         int save = -1, saveWrite = -1;
+        int shop = -1; // the Poke Mart, each frame it is up
         std::vector<int> levelUpWin; // the level-up window in a battle (BtlvCore_Wait*LevelUp*)
         int battleTarget = -1;       // choosing a move's target (double, triple, rotation battles)
         int evolution = -1;          // the evolution scene, which the battle fades out into
@@ -2679,6 +2680,9 @@ int main(int argc, char** argv)
         // Waits for the save memory: while the game writes its save it does nothing else, for
         // over a second, not even the overworld (see the save layout).
         bw2.saveWrite = bw2Find("CARD_WaitBackupAsync");
+        // The Poke Mart, each frame it is up: Black and White's name, then Black 2's.
+        bw2.shop = bw2Find("SCRCMD_PROC_FLD_StepShop");
+        if (bw2.shop < 0) bw2.shop = bw2Find("ShopUI_Update");
         bw2.battleTarget = bw2Find("BtlvCore_WaitTargetSelect");
         bw2.evolution = bw2Find("ShinkaDemo_Main");
         bw2.ballBarCreate = bw2Find("BtlvBGauge_Create");
@@ -3381,6 +3385,17 @@ int main(int argc, char** argv)
                     sc.items.push_back(b.crop);
                 }
             }
+        }
+        else if (funcWatch.Ran(bw2.shop, 16)) // (it skips a few frames while its windows open)
+        {
+            // The Poke Mart (Black and White, and Black 2 and White 2): its windows (money, the
+            // goods, how many, the message) cover the top screen over the overworld and run to
+            // its edges. They stay within it, the widened overworld beside them, rather than
+            // their rows drawn out to the view's edges (stripes from the list, bands beside the
+            // message).
+            only("shop", 0);
+            sc.wide = wideView;
+            sc.noEdges = true;
         }
         else if (funcWatch.Ran(bw2.field, 16))
         {

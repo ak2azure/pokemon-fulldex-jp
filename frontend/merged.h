@@ -140,6 +140,10 @@ struct Scene
     // snapshot of the world shown in 2D, which would turn into streaks), and a translucent
     // fill is blended with the wide world instead of the screen's own 3D (stripes otherwise).
     bool smartEdges = false;
+    // With `wide`: no 2D is continued beside the top screen at all, the world shows there: the
+    // 2D is windows laid out within the screen (Black and White's Poke Mart, whose list and
+    // money windows run to its edges and were drawn out as stripes and bands).
+    bool noEdges = false;
     // With `wide`: this frame shows the top screen at 4:3 after all, while the widescreen
     // renderer keeps running (a picture in 2D covers the world; see MergedEdgesArePicture).
     bool narrow = false;
@@ -281,6 +285,7 @@ inline EdgeContinuation MergedEdgeContinuation(const Scene& scene, const ScreenI
 {
     const int sx = side ? 255 : 0;
     const EdgeContinuation none = { 0, 0, 16 };
+    if (scene.noEdges) return none;
     // (Nor where the piece leaves the screen out: that part is drawn elsewhere.)
     if (scene.items[0].Skips(sx, sy)) return none;
     const uint8_t cls = LayerClass(top.flags[sy * 256 + sx]);

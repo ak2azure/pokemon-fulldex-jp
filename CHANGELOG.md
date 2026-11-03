@@ -9,6 +9,9 @@
   on the JIT, and the picture is drawn by the graphics chip at the screen's own resolution (4K on
   a 4K TV), with WORLD ON GPU, through Vulkan; if that cannot start, the processor draws it at
   1920x1080.
+- **Black and White's Poké Mart in the widescreen view**: the list of goods and the money and
+  message windows stay within the screen, with the overworld beside them, instead of their
+  rows drawn out to the view's edges as stripes and bands. (Black 2 and White 2's shop too.)
 - **OTHER VERSION POKEMON** (pause menu) in the Japanese HeartGold and SoulSilver too: the wild
   Pokémon of both versions, as in the English ones.
 - The pause menu is smoother on large screens (the PS5's 4K above all): the paused picture is
