@@ -9,8 +9,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <time.h>
+#include <unistd.h>
+
+int scePthreadGetaffinity(pthread_t thread, uint64_t* mask);
 
 #include <ps5platform/libc.h>
 
@@ -132,5 +137,17 @@ int __wrap_sceImeDialogGetResult(void *result)
 int __wrap_sceImeDialogTerm(void) { return 0; }
 
 /* sysconf answers 16 processors where a title's threads run on 13 (the compositor and the
- * widescreen 3D size their thread pools by it). */
-long __wrap_sysconf(int name) { return ps5_sysconf(name); }
+ * widescreen 3D size their thread pools by it). Only those two questions go to ps5_sysconf:
+ * for any other it calls sysconf, which this link sends back here, and RADV's first
+ * sysconf(_SC_PAGESIZE) recursed until its thread's stack ran out (the Vulkan title's crash). */
+long __real_sysconf(int name);
+long __wrap_sysconf(int name)
+{
+    if (name == _SC_NPROCESSORS_ONLN || name == _SC_NPROCESSORS_CONF)
+    {
+        uint64_t mask = 0;
+        if (scePthreadGetaffinity(pthread_self(), &mask) == 0 && mask != 0)
+            return __builtin_popcountll(mask);
+    }
+    return __real_sysconf(name);
+}
