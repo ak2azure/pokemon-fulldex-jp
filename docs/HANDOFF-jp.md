@@ -134,7 +134,7 @@
 - 別バージョンのポケモン（OTHER VERSION POKEMON、frontend/exclusives.h）を日本語版 HG/SS（IPKJ/IPGJ）にも（11/3）: 英語版だけに限っていた。NARC（a/0/3/7、a/1/3/6）とテーブルの形は同じで、フックのアドレス（0x0203B88C）はruntime の Remap が日本語版の位置に移す。WSL で HG は 142 テーブルずつ読め、マップに入るたびにフックが呼ばれてテーブルを見つけた（ワカバタウン付近は差のないテーブル）。SS も 142 ずつ読めた。両方の差がある道路での確認は未。
 - WSL（Ubuntu-24.04）を入れた: `wsl -d Ubuntu-24.04 -u root`。/root/fulldex（Windows のクローンから git clone）、/root/work（ROM とセーブのコピー、IRBJ.txt）。Git Bash からは MSYS_NO_PATHCONV=1 を付けて、スクリプトをファイルで渡す。表だけ＋JIT のビルドは数分。
 - 本家（upstream/main、3a7028f まで 31 コミット）をマージした（11/3）: スペイン語・フランス語・イタリア語版、ダイヤモンド・パール（試験的）、セーブのバックアップ、チート検索、アップデーター、Android・iOS・Mac の変更、11/1〜2 のホットフィックス。本家は地域版のゲームコードを frontend/gamecode.h（BaseGameCode、IsGame）で英語版に読み替えるので、日本語版（IRBJ・IRAJ・IREJ・CPUJ・IPGJ・IPKJ）もそこに足し、衝突は本家側を取りつつ日本語版の表（bw2map、launcher のセーブ名、CPUJ.txt）を残した。言語: 本家の UiLang（ui_lang.h、list_lang: auto/en/es/it）に ja を足して 1 つの設定にした（既定 ja、日本語の訳と字形は I18n・jpfont のまま、UiLang::Tr が日本語のときは I18n::Tr を呼ぶ）。古い list_language は list_lang がないときだけ読む。GAME LIST の LANGUAGE は消して DISPLAY の LANGUAGE（とポーズメニュー）だけ。runtime の overlay の base は本家の「ROM が読み込む先（ram）」に（日本語版の SectionMove と同じ値）。バトルの技欄の判定は本家の帯の走査に日本語版の広さ（縦 -18〜-10、横 ±40、白 3 画素以上）を合わせた。WSL で日本語版 HG（ワイド、別バージョンのポケモン）、ブラックのメニュー（日本語・スペイン語）を確認、PS5 タイトルもビルドが通った。PS5・PC の全ゲーム版の配布物には、本家の地域版の関数表（tools/versions、tools/regions）はまだ入れていない。
-- 11/3 後半（ブランチ claude/heuristic-villani-21fcd2、main には未マージ）:
+- 11/3 後半（ブランチ claude/heuristic-villani-21fcd2、11/3 夜に main へマージ済み）:
   - BW のショップ（94c0aab）: SCRCMD_PROC_FLD_StepShop（B2 は ShopUI_Update）の間は場面 "shop"、Scene::noEdges で 2D を画面の外へ伸ばさない（リストの縞・帯が消えた）。ユーザーのブラックのセーブ（ur_in.st）で確認。B2 は未確認。
   - 60fps 中間フレームの木・床のちらつき（892fb79）: 相手のないポリゴンを場面の平均で動かすのをやめ、カメラの動き（clip の平均）で前のフレームの同じ種類のポリゴンを探し直して組にする。ユーザーのブラックのセーブ（サンヨウシティ、Downloads/black-jp.sav）で 54 中 48→0。岩の道は変化なし。
   - PS5 の起動時の通知をやめた（5581b77、エラーの通知は残す）。
@@ -143,6 +143,10 @@
   - PS5 の LAN「部屋を作る」で固まる（0f4feb7）: タイトルでは fcntl の O_NONBLOCK がソケットに効かない（Porpoise も同じ）。ENet の unix.c と LAN.cpp（patch に追加）で SO_NBIO（0x1200）。PC の 2 台で 2 人の部屋になるのは確認。**PS5 で通信交換・早送り・タッチ操作とも実機で問題なし（11/3、ユーザー確認）。**
   - PS5 のタイルの背景・BGM・アイコンは PSGFX（C:\Users\user\Documents\PSGFX）で設定済み（ユーザーの画像と曲、配布物には入れない）。以後のビルドの更新は PKFD00002/eboot.bin だけを置き換える（フォルダーごとだと sce_sys が戻る）。PS5Upload の「ファイル」で上書きし、CRC32 で確かめられる。PS5 再起動後は PS5Upload のホームの「ヘルパーを送信」が要る。
   - PS5 の確認は PS5Upload の「プレイ」（リモートプレイ）で画面を見て、キーボード（矢印・Enter）で操作できる。ゲームのポーズメニューは Options＋Create で、配信のキー割り当ては未調査。
+- 11/3 夜（main にマージ済み、PS5 実機は未確認）:
+  - ゲームの音を半分に（147bb8d）: main.cpp の音量のところで GameLevel 50（早送りも含む）。ゲーム一覧のメニュー音・BGM はそのまま。PC で 0.485 倍を確認。
+  - 設定の説明文の日本語化（418ab98）: 本家のスペイン語の表（ui_lang.h の Spanish()）にあって i18n_ja.h にない 108 個を訳した。組み合わせの文（FOLDER: / VERSION ... IS OUT / バックアップの日付＋RESTORES ... など）は i18n.h の affixes と専用の処理。PC 版のキーの行（ENTER: PLAY など）は kPhrases。確かめ方: scratchpad の esmiss.py（スペイン語の表との差）、miss.py（ソースの文字列との差）、WSL の PC 版を xdotool で動かして ffmpeg x11grab で設定の各グループを撮る（WSLg では最初にウィンドウをクリックしないとキーが届かない）。ポーズメニューのチート・バックアップの画面は画面では未確認。
+  - PS5 のタイトル名を「Pokémon Fulldex」に（4188a2d）。ユーザーの PS5 は PSGFX の Home layout で名前を変え（バックアップ 2026-11-03_224052、プリセット My layout）、param.json も PS5Upload で上書きした。ホーム画面の名前はアプリのデータベースにあるので、param.json だけでは変わらない。
 - 未確認・今後: ほかの作品（ホワイト、ブラック2、プラチナ、SS/HG）の PS5 での動作、ときどき落ちるフレーム、終了後に黒い画面が残らないか（インタプリタで重い可能性）、JIT（sceKernelJitCreateSharedMemory 等）。
 
 ## ROMの場所（ユーザーPC）
