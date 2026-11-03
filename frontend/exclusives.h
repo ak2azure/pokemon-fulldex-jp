@@ -49,7 +49,11 @@ public:
     // tables loaded).
     void Init(const std::string& romPath, const std::string& code, melonDS::NDS& nds)
     {
-        if (code != "IPGE" && code != "IPKE") return;
+        // (The Japanese versions too, IPGJ and IPKJ: the same archives and table layout, and
+        // the hook's address is moved to theirs by the runtime, as the function tables are:
+        // tools/soulsilver/*-jp.json.)
+        const bool heartGold = code == "IPKE" || code == "IPKJ";
+        if (!heartGold && code != "IPGE" && code != "IPGJ") return;
         Nds = &nds;
         std::vector<std::vector<uint8_t>> hg, ss;
         if (!ReadNarc(romPath, "a/0/3/7", hg) || !ReadNarc(romPath, "a/1/3/6", ss) || hg.size() != ss.size())
@@ -57,7 +61,7 @@ public:
             fprintf(stderr, "[exclusives] the wild Pokemon tables could not be read\n");
             return;
         }
-        if (code == "IPKE") { Own = std::move(hg); Other = std::move(ss); }
+        if (heartGold) { Own = std::move(hg); Other = std::move(ss); }
         else { Own = std::move(ss); Other = std::move(hg); }
         if (rc_add_hook("main", 0x0203B88C, &VersionExclusives::Read, this) < 0)
         {
