@@ -1911,7 +1911,9 @@ bool Start(int& argc, char**& argv)
     fprintf(stderr, "[launcher] folder %s\n", fo.dir.c_str());
 #ifdef SSR_PS5
     Ps5::CloseAppAtExit();
-    Ps5::Notify("Pokemon Fulldex: starting (%s)", fo.dir.c_str());
+    // (In the log only: a notification in the corner of the screen at every start was noise.
+    // The ones that say something went wrong stay.)
+    fprintf(stderr, "[ps5] Pokemon Fulldex: starting (%s)\n", fo.dir.c_str());
     // Each frame shown while the next is emulated, as on the Switch: SDL's PS5 picture waits
     // for the screen's flip, which otherwise came after the emulation and drawing, so a frame
     // a little over 16.7 ms waited for the next flip (30 frames a second, the game at half
