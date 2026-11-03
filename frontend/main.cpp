@@ -1526,7 +1526,16 @@ static void BlendCanvas(const Canvas& c, std::vector<uint32_t>& img)
 {
     for (size_t i = 0; i < img.size() && i < c.px.size(); i++)
     {
+        // (The backdrop first, under the canvas's own pixels: as the window shows it.)
         uint32_t o = c.px[i];
+        if (c.backdrop && (o >> 24) != 255)
+        {
+            const uint32_t ba = c.backdrop >> 24, d = img[i];
+            const uint32_t r = (((c.backdrop >> 16) & 0xFF) * ba + ((d >> 16) & 0xFF) * (255 - ba)) / 255;
+            const uint32_t g = (((c.backdrop >> 8) & 0xFF) * ba + ((d >> 8) & 0xFF) * (255 - ba)) / 255;
+            const uint32_t b = ((c.backdrop & 0xFF) * ba + (d & 0xFF) * (255 - ba)) / 255;
+            img[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+        }
         uint32_t a = o >> 24;
         if (!a) continue;
         if (a == 255)
@@ -1949,6 +1958,11 @@ int main(int argc, char** argv)
     SDL_Texture* tex[2] = { nullptr, nullptr };
     SDL_Texture* overlayTex = nullptr;
     int overlayTexW = 0, overlayTexH = 0;
+    // What overlayTex was last sent: its rectangle and pixels (renderFrame sends it again only
+    // when they change).
+    SDL_Texture* overlaySentTex = nullptr;
+    SDL_Rect overlaySentRect[1] {};
+    std::vector<uint32_t> overlaySent;
     SDL_AudioDeviceID audio = 0;
     Pads pads;
     Layout layout = LayoutFromName(cfg.layout);
@@ -4055,6 +4069,7 @@ int main(int argc, char** argv)
     uint32_t scriptClock = frame; // equals frame unless --battle-mash holds it during battles
 
     Canvas canvas;
+    canvas.screenBackdrop = true; // (the pause menu's darkening: renderFrame and BlendCanvas)
     Menu menu;
     // The pause menu's items (menuIds: the item in each row) and its pages (menuPage): the menu
     // itself, then DISPLAY, GRAPHICS and CONTROLS, and in CONTROLS the keys and buttons
@@ -4674,15 +4689,37 @@ int main(int argc, char** argv)
             {
                 if (overlayTex) SDL_DestroyTexture(overlayTex);
                 overlayTex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, canvas.w, canvas.h);
+                overlaySentTex = nullptr; // (a new texture may have the old one's address)
                 SDL_SetTextureBlendMode(overlayTex, SDL_BLENDMODE_BLEND);
                 SDL_SetTextureScaleMode(overlayTex, SDL_ScaleModeNearest);
                 overlayTexW = canvas.w;
                 overlayTexH = canvas.h;
             }
+            if (canvas.backdrop)
+            {
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                SDL_SetRenderDrawColor(renderer, (canvas.backdrop >> 16) & 0xFF, (canvas.backdrop >> 8) & 0xFF,
+                    canvas.backdrop & 0xFF, canvas.backdrop >> 24);
+                SDL_RenderFillRect(renderer, nullptr);
+            }
             if (canvas.Dirty())
             {
                 const SDL_Rect dr = { canvas.x0d, canvas.y0d, canvas.x1d - canvas.x0d, canvas.y1d - canvas.y0d };
-                SDL_UpdateTexture(overlayTex, &dr, canvas.px.data() + (size_t)dr.y * canvas.w + dr.x, canvas.w * 4);
+                // (Sent only when it changed: the pause menu stays the same for most frames, and
+                // on the PS5's 3840x2160 picture sending it took a few milliseconds a frame.)
+                bool same = overlaySentTex == overlayTex && overlaySent.size() == (size_t)dr.w * dr.h &&
+                    !memcmp(overlaySentRect, &dr, sizeof dr);
+                for (int y = 0; same && y < dr.h; y++)
+                    same = !memcmp(&overlaySent[(size_t)y * dr.w], &canvas.px[(size_t)(dr.y + y) * canvas.w + dr.x], dr.w * 4);
+                if (!same)
+                {
+                    SDL_UpdateTexture(overlayTex, &dr, canvas.px.data() + (size_t)dr.y * canvas.w + dr.x, canvas.w * 4);
+                    overlaySent.resize((size_t)dr.w * dr.h);
+                    for (int y = 0; y < dr.h; y++)
+                        memcpy(&overlaySent[(size_t)y * dr.w], &canvas.px[(size_t)(dr.y + y) * canvas.w + dr.x], dr.w * 4);
+                    memcpy(overlaySentRect, &dr, sizeof dr);
+                    overlaySentTex = overlayTex;
+                }
                 const int k = canvas.w > 0 ? std::max(1, j.outW / canvas.w) : 1;
                 const SDL_Rect sr = { dr.x * k, dr.y * k, dr.w * k, dr.h * k };
                 SDL_RenderCopy(renderer, overlayTex, &dr, &sr);
@@ -6038,6 +6075,7 @@ int main(int argc, char** argv)
                 wideImage.pixels = melonDS::Wide.Front;
                 wideImage.w = melonDS::Wide.FrontW;
                 wideImage.h = melonDS::Wide.FrontH;
+                wideImage.serial = melonDS::Wide.FrontSerial;
                 // Fades: the game darkens or whitens its screen with the master brightness
                 // register, or with a brightness effect on the 3D layer.
                 const auto& unit = wideUnit;

@@ -246,13 +246,24 @@ private:
         if (!tex) return;
         SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_NONE);
         SDL_SetTextureScaleMode(tex, smooth ? SDL_ScaleModeLinear : SDL_ScaleModeNearest);
-        const auto t0 = std::chrono::steady_clock::now();
-        const uint32_t* px = wide.placed ? wide.pixels
-            : MergedFillWideHoles(wide, (int)std::floor(v.originX * wide.w / outW),
-                  (int)std::ceil((v.originX + 256 * v.unit) * wide.w / outW), WideFilled);
-        SDL_UpdateTexture(tex, nullptr, px, wide.w * 4);
-        WideUploadMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-        WideUploads++;
+        // (The same picture as last time, with its holes filled from the same place, is in the
+        // texture already: while paused, or when a frame is shown again.)
+        const int fillFrom = (int)std::floor(v.originX * wide.w / outW);
+        const int fillTo = (int)std::ceil((v.originX + 256 * v.unit) * wide.w / outW);
+        if (!(wide.serial && WideTex.hasSig && wide.serial == WideSentSerial && wide.placed == WideSentPlaced &&
+                fillFrom == WideSentFrom && fillTo == WideSentTo))
+        {
+            const auto t0 = std::chrono::steady_clock::now();
+            const uint32_t* px = wide.placed ? wide.pixels : MergedFillWideHoles(wide, fillFrom, fillTo, WideFilled);
+            SDL_UpdateTexture(tex, nullptr, px, wide.w * 4);
+            WideUploadMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            WideUploads++;
+            WideTex.hasSig = true;
+            WideSentSerial = wide.serial;
+            WideSentPlaced = wide.placed;
+            WideSentFrom = fillFrom;
+            WideSentTo = fillTo;
+        }
         if (wide.placed)
         {
             // The widened top screen, at its place in the view.
@@ -451,6 +462,10 @@ private:
     std::vector<Tex> Slots;
     std::vector<bool> CachedPremul; // (each slot's last blend mode, for a texture not uploaded again)
     Tex WideTex, EdgeTex[2], FillTex[2], NarrowTex[2], WeatherTex[2];
+    // What WideTex holds (DrawWide; WideTex.hasSig: whether it holds anything sent).
+    uint64_t WideSentSerial = 0;
+    bool WideSentPlaced = false;
+    int WideSentFrom = 0, WideSentTo = 0;
     uint32_t Fill[16 * 192];
     std::vector<SDL_Rect> Spans;
     std::vector<uint32_t> Buf, WideFilled;

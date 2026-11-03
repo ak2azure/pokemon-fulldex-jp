@@ -8,6 +8,9 @@
   on the JIT, and the picture is drawn by the graphics chip at the screen's own resolution (4K on
   a 4K TV), with WORLD ON GPU, through Vulkan; if that cannot start, the processor draws it at
   1920x1080.
+- The pause menu is smoother on large screens (the PS5's 4K above all): the paused picture is
+  not sent to the graphics chip again every frame, and the darkening behind the menu is drawn by
+  the graphics chip.
 - **LAN PLAY** (pause menu): the DS's local wireless with another program on the same network,
   for trades, battles and the Union Room: another copy of this one or melonDS 1.1 itself (its
   own LAN play). One hosts (HOST), the others join it (JOIN shows the hosts found; or melonDS's

@@ -32,6 +32,12 @@ struct Canvas
     // cleared and sent to the screen: the canvas is as large as the window.
     int x0d = 0, y0d = 0, x1d = 0, y1d = 0;
     bool Dirty() const { return x1d > x0d && y1d > y0d; }
+    // A colour over the whole picture under the canvas (the pause menu's darkening), when its
+    // owner draws that itself (screenBackdrop: main.cpp, by the graphics chip and BlendCanvas)
+    // instead of filling every pixel of the canvas with it: on the PS5's 3840x2160 picture the
+    // whole canvas filled, cleared and sent each frame was most of the pause menu's time.
+    bool screenBackdrop = false;
+    uint32_t backdrop = 0;
     void Clear()
     {
         for (int yy = y0d; yy < y1d; yy++)
@@ -39,6 +45,13 @@ struct Canvas
         x0d = w;
         y0d = h;
         x1d = y1d = 0;
+        backdrop = 0;
+    }
+    // The whole picture darkened or tinted under what is drawn next.
+    void Backdrop(uint32_t argb)
+    {
+        if (screenBackdrop) backdrop = argb;
+        else Fill(0, 0, w, h, argb);
     }
 
     void Fill(int x, int y, int rw, int rh, uint32_t argb)
@@ -327,7 +340,7 @@ struct Menu
         drawnLineH = lineH;
         drawnFirstY = by + (hasTitle ? lineH : 0) + 5 * scale - 2 * scale;
 
-        c.Fill(0, 0, c.w, c.h, 0xA0000000);
+        c.Backdrop(0xA0000000);
         c.Fill(bx - scale, by - scale, boxW + 2 * scale, boxH + 2 * scale, 0xFFE8E8E8);
         c.Fill(bx, by, boxW, boxH, boxCol);
         if (hasTitle) c.Text(bx + (boxW - Canvas::TextWidth(title, scale)) / 2, by + 3 * scale, title, scale, 0xFFFFD75E);

@@ -194,6 +194,10 @@ struct WideImage
     // the first piece, which is not drawn.
     bool placed = false;
     int baseX = 0;
+    // Which of the renderer's pictures this is (melonDS::Wide.FrontSerial), so that the same
+    // one is not handed to the graphics chip again (gpucompose.h: while paused, 4.5 ms a frame
+    // at 3840x2160 on the PS5). 0: not known, always sent.
+    uint64_t serial = 0;
 };
 
 struct ScreenImage
