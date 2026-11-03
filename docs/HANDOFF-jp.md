@@ -143,7 +143,7 @@
   - PS5 の LAN「部屋を作る」で固まる（0f4feb7）: タイトルでは fcntl の O_NONBLOCK がソケットに効かない（Porpoise も同じ）。ENet の unix.c と LAN.cpp（patch に追加）で SO_NBIO（0x1200）。PC の 2 台で 2 人の部屋になるのは確認。**PS5 で通信交換・早送り・タッチ操作とも実機で問題なし（11/3、ユーザー確認）。**
   - PS5 のタイルの背景・BGM・アイコンは PSGFX（C:\Users\user\Documents\PSGFX）で設定済み（ユーザーの画像と曲、配布物には入れない）。以後のビルドの更新は PKFD00002/eboot.bin だけを置き換える（フォルダーごとだと sce_sys が戻る）。PS5Upload の「ファイル」で上書きし、CRC32 で確かめられる。PS5 再起動後は PS5Upload のホームの「ヘルパーを送信」が要る。
   - PS5 の確認は PS5Upload の「プレイ」（リモートプレイ）で画面を見て、キーボード（矢印・Enter）で操作できる。ゲームのポーズメニューは Options＋Create で、配信のキー割り当ては未調査。
-- 11/3 夜（main にマージ済み、PS5 実機は未確認）:
+- 11/3 夜（main にマージ済み。**PS5 実機で BGM の切り替え・ゲームの音量・日本語のメニュー・アプリ名とも問題なし、ユーザー確認**）:
   - ゲームの音を半分に（147bb8d）: main.cpp の音量のところで GameLevel 50（早送りも含む）。ゲーム一覧のメニュー音・BGM はそのまま。PC で 0.485 倍を確認。
   - 設定の説明文の日本語化（418ab98）: 本家のスペイン語の表（ui_lang.h の Spanish()）にあって i18n_ja.h にない 108 個を訳した。組み合わせの文（FOLDER: / VERSION ... IS OUT / バックアップの日付＋RESTORES ... など）は i18n.h の affixes と専用の処理。PC 版のキーの行（ENTER: PLAY など）は kPhrases。確かめ方: scratchpad の esmiss.py（スペイン語の表との差）、miss.py（ソースの文字列との差）、WSL の PC 版を xdotool で動かして ffmpeg x11grab で設定の各グループを撮る（WSLg では最初にウィンドウをクリックしないとキーが届かない）。ポーズメニューのチート・バックアップの画面は画面では未確認。
   - PS5 のタイトル名を「Pokémon Fulldex」に（4188a2d）。ユーザーの PS5 は PSGFX の Home layout で名前を変え（バックアップ 2026-11-03_224052、プリセット My layout）、param.json も PS5Upload で上書きした。ホーム画面の名前はアプリのデータベースにあるので、param.json だけでは変わらない。
