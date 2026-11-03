@@ -139,7 +139,7 @@
   - PS5 の起動時の通知をやめた（5581b77、エラーの通知は残す）。
   - PS5 で右スティックのタッチカーソルを常にオン（ed38827、L2 でタッチ、R3 で画面入れ替え、L3 は使わない）。
   - 早送りの音（335bb44）: 本家の「音楽は普通の速さ、あふれたら捨てる」をやめ、AudioStretch::Squeeze で全部の音を速く（音程はそのまま）流す。
-  - PS5 の LAN「部屋を作る」で固まる（0f4feb7）: タイトルでは fcntl の O_NONBLOCK がソケットに効かない（Porpoise も同じ）。ENet の unix.c と LAN.cpp（patch に追加）で SO_NBIO（0x1200）。PC の 2 台で 2 人の部屋になるのは確認、PS5 は未確認。
+  - PS5 の LAN「部屋を作る」で固まる（0f4feb7）: タイトルでは fcntl の O_NONBLOCK がソケットに効かない（Porpoise も同じ）。ENet の unix.c と LAN.cpp（patch に追加）で SO_NBIO（0x1200）。PC の 2 台で 2 人の部屋になるのは確認。**PS5 で通信交換・早送り・タッチ操作とも実機で問題なし（11/3、ユーザー確認）。**
   - PS5 のタイルの背景・BGM・アイコンは PSGFX（C:\Users\user\Documents\PSGFX）で設定済み（ユーザーの画像と曲、配布物には入れない）。以後のビルドの更新は PKFD00002/eboot.bin だけを置き換える（フォルダーごとだと sce_sys が戻る）。PS5Upload の「ファイル」で上書きし、CRC32 で確かめられる。PS5 再起動後は PS5Upload のホームの「ヘルパーを送信」が要る。
   - PS5 の確認は PS5Upload の「プレイ」（リモートプレイ）で画面を見て、キーボード（矢印・Enter）で操作できる。ゲームのポーズメニューは Options＋Create で、配信のキー割り当ては未調査。
 - 未確認・今後: ほかの作品（ホワイト、ブラック2、プラチナ、SS/HG）の PS5 での動作、ときどき落ちるフレーム、終了後に黒い画面が残らないか（インタプリタで重い可能性）、JIT（sceKernelJitCreateSharedMemory 等）。
