@@ -9,6 +9,8 @@
 //
 // The list's music: the player's own song (music.ogg or music.wav beside the saves, GAME LIST:
 // MUSIC), played over and over under the menu sounds while the list is up. Nothing is built in.
+// An Ogg file's LOOPSTART and LOOPLENGTH (or LOOPEND) tags, in samples, as game music ripped to
+// Ogg often has them, make it go back to LOOPSTART at the loop's end instead of to its start.
 //
 // Only what these short sequences use is played: notes and rests, the track's volume, expression,
 // pan, transposition and pitch bend, the instrument's envelope (or the track's own), several
@@ -650,6 +652,9 @@ struct Music
     stb_vorbis* ogg = nullptr;
     std::vector<int16_t> wav;
     size_t wavAt = 0;
+    // (In samples of one channel at the file's rate: where the song is, and its loop. No loop
+    // end: the whole song.)
+    uint64_t at = 0, loopStart = 0, loopEnd = 0;
     int channels = 0;
     SDL_AudioStream* stream = nullptr;
     std::string from;
@@ -664,6 +669,7 @@ struct Music
         file.clear();
         wav.clear();
         wavAt = 0;
+        at = loopStart = loopEnd = 0;
         from.clear();
     }
     bool Open(const std::string& path, int rate)
@@ -696,6 +702,18 @@ struct Music
             const stb_vorbis_info info = stb_vorbis_get_info(ogg);
             channels = info.channels;
             fileRate = (int)info.sample_rate;
+            const stb_vorbis_comment tags = stb_vorbis_get_comment(ogg);
+            uint64_t length = 0;
+            for (int i = 0; i < tags.comment_list_length; i++)
+            {
+                const char* t = tags.comment_list[i];
+                if (!SDL_strncasecmp(t, "LOOPSTART=", 10)) loopStart = strtoull(t + 10, nullptr, 10);
+                else if (!SDL_strncasecmp(t, "LOOPLENGTH=", 11)) length = strtoull(t + 11, nullptr, 10);
+                else if (!SDL_strncasecmp(t, "LOOPEND=", 8)) loopEnd = strtoull(t + 8, nullptr, 10);
+            }
+            if (length) loopEnd = loopStart + length;
+            const uint64_t total = stb_vorbis_stream_length_in_samples(ogg);
+            if (loopEnd <= loopStart || (total && loopEnd > total)) loopStart = loopEnd = 0;
         }
         else
         {
@@ -741,21 +759,29 @@ struct Music
             return false;
         }
         from = path;
-        fprintf(stderr, "[music] %s: %d channels at %d Hz\n", path.c_str(), channels, fileRate);
+        fprintf(stderr, "[music] %s: %d channels at %d Hz", path.c_str(), channels, fileRate);
+        if (loopEnd) fprintf(stderr, ", looping from %.3f s to %.3f s", loopStart / (double)fileRate, loopEnd / (double)fileRate);
+        fprintf(stderr, "\n");
         return true;
     }
-    // The next `n` samples (stereo, at the output's rate), from the start again after the end.
+    // The next `n` samples (stereo, at the output's rate), from the start (or the loop's start)
+    // again after the end (or the loop's end).
     void Read(int16_t* out, int n)
     {
         int16_t piece[2048];
-        const int frames = 1024;
         while (SDL_AudioStreamAvailable(stream) < n * 2)
         {
             int got = 0;
+            const int frames = loopEnd ? (int)std::min<uint64_t>(1024, loopEnd - at) : 1024;
             if (ogg)
             {
-                got = stb_vorbis_get_samples_short_interleaved(ogg, channels, piece, frames * channels);
-                if (got == 0) stb_vorbis_seek_start(ogg);
+                got = frames > 0 ? stb_vorbis_get_samples_short_interleaved(ogg, channels, piece, frames * channels) : 0;
+                at += (uint64_t)got;
+                if (got == 0 || (loopEnd && at >= loopEnd))
+                {
+                    stb_vorbis_seek(ogg, (unsigned)loopStart);
+                    at = loopStart;
+                }
             }
             else
             {
