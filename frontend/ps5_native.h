@@ -220,7 +220,7 @@ inline void Hex(char*& p, uint64_t v)
 
 inline void Put(const char* s)
 {
-    write(2, s, strlen(s));
+    write(fileno(stderr), s, strlen(s));
 }
 
 inline void OnCrash(int sig, siginfo_t* info, void*);
@@ -242,7 +242,7 @@ inline void ShowStack(const uint64_t* sp)
             *p++ = ' ';
             Hex(p, v);
             *p++ = '\n';
-            write(2, line, (size_t)(p - line));
+            write(fileno(stderr), line, (size_t)(p - line));
             shown++;
         }
     }
@@ -275,7 +275,7 @@ inline void OnCrash(int sig, siginfo_t* info, void* context)
     p += strlen(rsp);
     Hex(p, (uint64_t)m.mc_rsp);
     *p++ = '\n';
-    write(2, line, (size_t)(p - line));
+    write(fileno(stderr), line, (size_t)(p - line));
     // (The handler runs on a stack of its own, CrashStack, so that an overflow is reported too:
     // the crashed thread's stack is the one at the time of the fault.)
     ShowStack(reinterpret_cast<const uint64_t*>(m.mc_rsp));
@@ -296,7 +296,7 @@ inline void OnWhere(int, siginfo_t*, void* context)
     p += strlen(head);
     Hex(p, (uint64_t)m.mc_rip);
     *p++ = '\n';
-    write(2, line, (size_t)(p - line));
+    write(fileno(stderr), line, (size_t)(p - line));
     ShowStack(reinterpret_cast<const uint64_t*>(m.mc_rsp));
     Put("[ps5] end of the report\n");
 }

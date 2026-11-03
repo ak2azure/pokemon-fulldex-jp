@@ -1588,13 +1588,13 @@ bool Start(int& argc, char**& argv)
             setvbuf(stderr, nullptr, _IOLBF, 0);
         Ps5::Notify("Pokemon Fulldex: /data cannot be reached. Is etaHEN running?");
     }
-    // (The title's libc reopens stderr on a new descriptor rather than on 2, so what is written
-    // to descriptor 2 directly, as the crash reports and RADV's trace points do with write(),
-    // went nowhere: 2 is made game.log too.)
+    // (The title's libc reopens stderr on a new descriptor rather than on 2, so the crash
+    // reports and RADV's trace points write to fileno(stderr); 2 is made game.log too, for
+    // anything else that writes there. A title's dup2 did not seem to.)
     const int logFd = fileno(stderr);
-    if (logFd != 2) dup2(logFd, 2);
-    fprintf(stderr, "[ps5] the title (eboot.bin), pid %d, uid %d; /data %s; log on descriptor %d\n",
-        (int)getpid(), (int)geteuid(), freed ? "reached" : "NOT reached", logFd);
+    const int dup = logFd != 2 ? dup2(logFd, 2) : 2;
+    fprintf(stderr, "[ps5] the title (eboot.bin), pid %d, uid %d; /data %s; log on descriptor %d (dup2: %d)\n",
+        (int)getpid(), (int)geteuid(), freed ? "reached" : "NOT reached", logFd, dup);
     Ps5Native::LogCrashes();
 #endif
     fprintf(stderr, "[launcher] folder %s\n", fo.dir.c_str());

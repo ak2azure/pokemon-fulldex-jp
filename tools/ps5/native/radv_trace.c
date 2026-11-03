@@ -8,14 +8,15 @@
 // take only pointers and integers (six or fewer) and return a pointer, an integer or nothing,
 // so the registers are passed through as they came.
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
 static void say(const char* a, const char* b)
 {
-    write(2, a, strlen(a));
-    write(2, b, strlen(b));
-    write(2, "\n", 1);
+    write(fileno(stderr), a, strlen(a));
+    write(fileno(stderr), b, strlen(b));
+    write(fileno(stderr), "\n", 1);
 }
 
 static void say_hex(const char* a, uint64_t v)
@@ -29,7 +30,7 @@ static void say_hex(const char* a, uint64_t v)
     *p++ = 'x';
     for (int s = 60; s >= 0; s -= 4) *p++ = "0123456789abcdef"[(v >> s) & 15];
     *p++ = '\n';
-    write(2, line, (size_t)(p - line));
+    write(fileno(stderr), line, (size_t)(p - line));
 }
 
 #define SSR_TRACE(name)                                                                      \
