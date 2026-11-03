@@ -294,8 +294,8 @@ struct WideAccess
         std::vector<u8> KeepStrip;
         u32 Matched;
         // The camera's movement in clip coordinates (the same for near and far polygons, which
-        // move unlike on the screen): the mean over the pairs, what an unpaired polygon is
-        // moved back by half of.
+        // move unlike on the screen): the mean over the pairs, with which the unpaired are
+        // looked for again (Pair). 0 once Pair is done: nothing is moved by it.
         s64 SceneX, SceneY, SceneW;
     };
 
@@ -309,7 +309,7 @@ struct WideAccess
         typedef GPU3D::RawPolygon RawPolygon;
         // Polygons are matched in submission order. When the two frames do not line up (an
         // object entered or left), the search skips ahead a little; an unmatched polygon is
-        // moved back by half the scene's movement (Replay).
+        // looked for again by the camera's movement (below), or left where it is (Replay).
         auto sameKind = [](const RawPolygon& a, const RawPolygon& b) {
             return a.PolygonMode == b.PolygonMode && a.PolygonAttr == b.PolygonAttr &&
                 a.TexParam == b.TexParam && a.TexPalette == b.TexPalette;
@@ -515,12 +515,16 @@ struct WideAccess
         out.SceneX = sceneVerts ? sceneSum[0] / sceneVerts : 0;
         out.SceneY = sceneVerts ? sceneSum[1] / sceneVerts : 0;
         out.SceneW = sceneVerts ? sceneSum[2] / sceneVerts : 0;
-        // The mean is the camera's movement only when the pairs agree on it (the camera slid,
-        // as running past Black's rocks). When they do not (the camera turned, or a few wrong
-        // pairs far off make the mean), an unpaired polygon moved by it went far off: in White,
-        // walking with Bianca, the ground and trees were drawn twice their size over a building
-        // and the people on every in-between frame. Then the unpaired are left where they
-        // are, as before that correction.
+        // Polygons left unpaired, found again by the camera's movement: the previous frame's
+        // polygon of the same kind where this one was, the pairs' mean movement in clip
+        // coordinates (the same for near and far) undone. Running past Black's rocks the rock in
+        // front moved too far on the screen to be paired above, and it is found this way. An
+        // unpaired polygon was once moved back by that mean blindly instead, which was wrong for
+        // whatever had not moved with the camera: walking up through Striaton City, half the
+        // polygons (the trees among them) have no partner, and every in-between frame drew them
+        // as flat blobs, or on the PS5 the ground and trees at twice their size. What is not
+        // found stays where it is.
+        // The mean is the camera's movement only when the pairs agree on it (a slide).
         if (sceneVerts)
         {
             s64 spread[3] = { 0, 0, 0 };
@@ -544,12 +548,70 @@ struct WideAccess
             bool alike = true;
             for (int c = 0; c < 3; c++)
                 if (spread[c] / sceneVerts > std::abs(mean[c]) / 4 + ref / 256) alike = false;
-            if (!alike) out.SceneX = out.SceneY = out.SceneW = 0;
+            u32 found = 0, unpaired = 0;
+            if (alike)
+            {
+                static thread_local std::vector<u8> used;
+                used.assign(rawPrev.size(), 0);
+                for (size_t ci = 0; ci < rawCur.size(); ci++)
+                    if (out.Partner[ci] >= 0) used[out.Partner[ci]] = 1;
+                const s64 np = (s64)rawPrev.size(), nc = (s64)rawCur.size();
+                for (size_t ci = 0; ci < rawCur.size(); ci++)
+                {
+                    if (out.Partner[ci] >= 0) continue;
+                    unpaired++;
+                    const RawPolygon& cur = rawCur[ci];
+                    const int nverts = (cur.PolygonMode & 0x1) ? 4 : 3;
+                    // (Where it was: each corner less the mean, within a few DS pixels, a
+                    // pixel being 1/128 of the corner's depth in clip coordinates.)
+                    auto near = [&](const RawPolygon& p) {
+                        for (int i = 0; i < nverts; i++)
+                        {
+                            const s64 w = std::max<s64>(4096, std::abs((s64)cur.Vertices[i].Position[3]));
+                            const s64 tol = w / 32;
+                            for (int c = 0; c < 3; c++)
+                            {
+                                const int k = c == 2 ? 3 : c;
+                                if (std::abs((s64)cur.Vertices[i].Position[k] - mean[c] - p.Vertices[i].Position[k]) > tol)
+                                    return false;
+                            }
+                        }
+                        return true;
+                    };
+                    // (Near the same place in the list, counted from its front or its end, as
+                    // the scene vote above looks.)
+                    s64 hit = -1;
+                    for (int pass = 0; pass < 2 && hit < 0; pass++)
+                    {
+                        const s64 centre = pass == 0 ? (s64)ci : (s64)ci + np - nc;
+                        if (pass == 1 && np == nc) break;
+                        const s64 lo = std::max<s64>(0, centre - 256), hi = std::min<s64>(np, centre + 256);
+                        for (s64 k = lo; k < hi; k++)
+                            if (!used[k] && sameKind(rawPrev[k], cur) && near(rawPrev[k]))
+                            {
+                                hit = k;
+                                break;
+                            }
+                    }
+                    if (hit < 0) continue;
+                    used[hit] = 1;
+                    out.Partner[ci] = (s32)hit;
+                    out.Matched++;
+                    found++;
+                    // (Built on its own, and so is the next one: the strip's shared corners were
+                    // worked out with this one unpaired.)
+                    out.KeepStrip[ci] = 0;
+                    if (ci + 1 < rawCur.size()) out.KeepStrip[ci + 1] = 0;
+                }
+            }
             if (dbgPair)
-                fprintf(stderr, "[pair] scene %lld,%lld,%lld spread %lld,%lld,%lld: %s\n", (long long)mean[0], (long long)mean[1],
-                    (long long)mean[2], (long long)(spread[0] / sceneVerts), (long long)(spread[1] / sceneVerts),
-                    (long long)(spread[2] / sceneVerts), alike ? "slid" : "not a slide, unpaired left as they are");
+                fprintf(stderr, "[pair] scene %lld,%lld,%lld spread %lld,%lld,%lld: %s; %u of %u unpaired found by it\n",
+                    (long long)mean[0], (long long)mean[1], (long long)mean[2], (long long)(spread[0] / sceneVerts),
+                    (long long)(spread[1] / sceneVerts), (long long)(spread[2] / sceneVerts),
+                    alike ? "slid" : "not a slide", found, unpaired);
         }
+        // (No unpaired polygon is moved by the mean any more: Replay leaves them.)
+        out.SceneX = out.SceneY = out.SceneW = 0;
     }
 
     // Submits the recorded frame again into the given buffers. With `interpolate`, every
@@ -656,26 +718,6 @@ struct WideAccess
                             int d = v.TexCoords[c] - p.TexCoords[c];
                             if (!texStep[c] && d > -512 && d < 512) v.TexCoords[c] = (s16)((v.TexCoords[c] + p.TexCoords[c]) / 2);
                         }
-                    }
-                }
-                else if ((pr->SceneX || pr->SceneY || pr->SceneW) && [&] {
-                             // (Not where half the depth's movement is a large part of a corner's
-                             // depth: the polygon would be thrown about, or behind the camera.)
-                             for (int i = 0; i < nverts; i++)
-                                 if (std::abs(pr->SceneW / 2) * 4 > std::abs((s64)cur.Vertices[i].Position[3])) return false;
-                             return true;
-                         }())
-                {
-                    // Unpaired: moved back by half the scene's movement, as its paired neighbours
-                    // are. Left at its new position it stood apart from them by half the camera's
-                    // movement: running past Black's rocks, a face of one jumped sideways on every
-                    // in-between frame and the ground showed through the gap.
-                    for (int i = 0; i < nverts; i++)
-                    {
-                        Vertex& v = g.TempVertexBuffer[i];
-                        v.Position[0] = (s32)(v.Position[0] - pr->SceneX / 2);
-                        v.Position[1] = (s32)(v.Position[1] - pr->SceneY / 2);
-                        v.Position[3] = (s32)(v.Position[3] - pr->SceneW / 2);
                     }
                 }
             }
