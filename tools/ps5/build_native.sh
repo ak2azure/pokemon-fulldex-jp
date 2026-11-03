@@ -25,7 +25,7 @@
 # (a title cannot load Mesa's libraries, which the payload's graphics chip path used).
 #
 # The result, build-ps5-native-dist/ (a folder, not a zip):
-#   PKFD00002/        copied to /data/homebrew/PKFD00002: the title (Pokemon Fulldex Native)
+#   PKFD00002/        copied to /data/homebrew/PKFD00002: the title (Pokemon Fulldex)
 #   pokemon-ds-wide/  copied to /data/pokemon-ds-wide: the function tables; the ROMs go in roms
 set -euo pipefail
 
@@ -191,7 +191,7 @@ say "Compiling the program for the PS5, as a title"
         -DSSR_VULKAN_INCLUDE="$HERE/$RADV_INC" -DCMAKE_VERBOSE_MAKEFILE=OFF >/dev/null
     ninja -C build-ps5-native ssrecomp
 )
-title "$DIST/$TITLE_ID" "$TITLE_ID" "Pokémon Fulldex Native" build-ps5-native/pokemon-fulldex.elf
+title "$DIST/$TITLE_ID" "$TITLE_ID" "Pokémon Fulldex" build-ps5-native/pokemon-fulldex.elf
 cp build-ps5-native/pokemon-fulldex.elf.imports "$WORK/imports.txt"
 cp build-ps5-native/pokemon-fulldex.elf.map "$WORK/pokemon-fulldex.map"
 

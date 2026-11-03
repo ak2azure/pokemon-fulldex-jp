@@ -15,7 +15,7 @@
   tags, in samples, loops between them, as ripped game music often does. Several songs: put them
   in a folder named music there instead. They play in turn by name, each moving straight on to
   the next one's loop start at the end of its own loop.
-- **PS5: a test version that is a title of its own** (PKFD00002, "Pokémon Fulldex Native"): it
+- **PS5: a test version that is a title of its own** (PKFD00002, "Pokémon Fulldex"): it
   starts straight from its Home screen tile like any game, with no ELF loader or websrv, and the
   PS button goes to the Home screen and back. It asks etaHEN for /data as it starts. The games run
   on the JIT, and the picture is drawn by the graphics chip at the screen's own resolution (4K on
