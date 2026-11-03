@@ -37,12 +37,23 @@ static void say_hex(const char* a, uint64_t v)
     uint64_t __wrap_##name(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e,       \
                            uint64_t f)                                                       \
     {                                                                                        \
-        say("[radv] > ", #name);                                                             \
+        static int calls; /* (the first few calls only: some are made all the time later) */ \
+        const int n = __atomic_fetch_add(&calls, 1, __ATOMIC_RELAXED);                       \
+        if (n < 8) say("[radv] > ", #name);                                                  \
         const uint64_t r = __real_##name(a, b, c, d, e, f);                                  \
-        say("[radv] < ", #name);                                                             \
+        if (n < 8) say("[radv] < ", #name);                                                  \
         return r;                                                                            \
     }
 
+// (ac_compute_device_uuid is the one that prints the last line seen: its "<" line shows the
+// trace points work. The fourth console run closed after it and before radv_probe_video_decode,
+// where RADV hashes its cache UUID with BLAKE3, whose code picks SSE4.1, AVX2 or AVX-512 by
+// CPUID and XGETBV.)
+SSR_TRACE(ac_compute_device_uuid)
+SSR_TRACE(blake3_hasher_init)
+SSR_TRACE(blake3_hasher_update)
+SSR_TRACE(blake3_hasher_finalize)
+SSR_TRACE(radv_is_rt_wave64_enabled)
 SSR_TRACE(radv_probe_video_decode)
 SSR_TRACE(radv_probe_video_encode)
 SSR_TRACE(disk_cache_create)
